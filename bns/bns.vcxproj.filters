@@ -1,0 +1,145 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="bns.cpp" />
+    <ClCompile Include="..\..\PCE\pce\src\crt.cpp">
+      <Filter>pce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\PCE\pce\src\crypto.cpp">
+      <Filter>pce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\PCE\pce\src\freelist.cpp">
+      <Filter>pce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\PCE\pce\src\lnklst.cpp">
+      <Filter>pce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\PCE\pce\src\msvc.cpp">
+      <Filter>pce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\PCE\pce\src\murmur.cpp">
+      <Filter>pce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\PCE\pce\src\sha1.cpp">
+      <Filter>pce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\PCE\pce\src\util.cpp">
+      <Filter>pce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\PCE\pce\src\wincom.cpp">
+      <Filter>pce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\bzl\bzl\bnet\bnp_key16.cpp">
+      <Filter>bzl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\bzl\bzl\bnet\bnp_key26.cpp">
+      <Filter>bzl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\bzl\bzl\bnet\bsha.cpp">
+      <Filter>bzl</Filter>
+    </ClCompile>
+    <ClCompile Include="bnc.cpp" />
+    <ClCompile Include="helper.cpp" />
+    <ClCompile Include="..\..\netlib\netlib\netlib\netlib.cpp">
+      <Filter>netlib</Filter>
+    </ClCompile>
+    <ClCompile Include="chat.cpp" />
+    <ClCompile Include="ringbuffer.cpp">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="tls.cpp">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="capi.cpp">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="prx.cpp" />
+    <ClCompile Include="cfg.cpp" />
+    <ClCompile Include="web.cpp" />
+    <ClCompile Include="iptbl.cpp">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="syslog.cpp" />
+    <ClCompile Include="svc.cpp" />
+    <ClCompile Include="server.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="bzl">
+      <UniqueIdentifier>{a7d628dc-d3b3-446e-9108-550ede2c8a90}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="pce">
+      <UniqueIdentifier>{a78a4b07-d723-47a5-b650-8e6b4525c9a0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="netlib">
+      <UniqueIdentifier>{bc33142f-717e-4892-b4de-90254a3e78c6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="docs">
+      <UniqueIdentifier>{6e5f965d-95ae-43b0-b3bc-6ee740776091}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common">
+      <UniqueIdentifier>{dc15248f-c74f-423c-8741-3dc6a4a54122}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="web">
+      <UniqueIdentifier>{2490e1ef-4570-4e10-ba4f-894f5032e9f4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\bzl\bzl\bzl.h">
+      <Filter>bzl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bzl\bzl\bnet\bnp.h">
+      <Filter>bzl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bzl\bzl\bnet\mcp.h">
+      <Filter>bzl</Filter>
+    </ClInclude>
+    <ClInclude Include="bnc.h" />
+    <ClInclude Include="bns.h" />
+    <ClInclude Include="helper.h" />
+    <ClInclude Include="..\..\netlib\netlib\netlib\netlib.h">
+      <Filter>netlib</Filter>
+    </ClInclude>
+    <ClInclude Include="chat.h" />
+    <ClInclude Include="ringbuffer.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="tls.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="websocket.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="capi.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="prx.h" />
+    <ClInclude Include="web.h" />
+    <ClInclude Include="iptbl.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="syslog.h" />
+    <ClInclude Include="bzstrmap.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="server.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="tls_example.txt">
+      <Filter>docs</Filter>
+    </Text>
+    <Text Include="capi.txt">
+      <Filter>docs</Filter>
+    </Text>
+    <Text Include="bnet.txt">
+      <Filter>docs</Filter>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="web\index.html">
+      <Filter>web</Filter>
+    </None>
+    <None Include="test.html">
+      <Filter>web</Filter>
+    </None>
+  </ItemGroup>
+</Project>

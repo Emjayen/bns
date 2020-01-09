@@ -1,0 +1,115 @@
+<HTML>
+<HEAD>
+<META NAME="GENERATOR" Content="Microsoft Visual Studio">
+<TITLE></TITLE>
+</HEAD>
+<BODY>
+
+
+    <div id="root">
+
+    </div>
+
+
+<script>
+
+
+
+
+    function es_create(root_node, desc)
+    {
+        var es = new Object();
+
+        es.list = new Array();
+        es.root_node = root_node;
+
+        return es;
+    }
+
+    function es_add(es, obj)
+    {
+        es.list.push(obj);
+    }
+
+    function es_rem(es, obj)
+    {
+        for(let i = 0; i < es.list.length; i++)
+        {
+            if(es.list[i] == obj)
+            {
+                es.splice(i, 1);
+                break;
+            }
+        }
+    }
+
+    function es_update(es, field, pfcmp)
+    {
+        es.list.sort(function(a, b)
+        {
+            return pfcmp(a[field], b[field]);
+        });
+
+        nodes = es.root_node.childNodes;
+
+        for(var i = 0, x = 0; i < es.list.length; x++)
+        {
+            if(nodes[x].nodeType != Node.ELEMENT_NODE)
+                continue;
+
+            if(nodes[x] != es.list[i].__node)
+                es.root_node.insertBefore(es.list[i].__node, nodes[x]);
+
+            i++;
+        }
+    }
+
+
+
+
+    
+
+    Games = new Array();
+    
+
+    
+
+
+
+    function CreateGame(id, name, count)
+    {
+        var game = new Object();
+        
+        game.__node = document.getElementById("root").appendChild(document.createElement("div"));
+        game.__node.innerText = name + " count: " + count;
+
+        game.name = name;
+        game.count = count;
+
+        Games[id] = game;
+        es_add(es, game);
+    }
+
+
+    var es = es_create(document.getElementById("root"));
+
+
+    for(var i = 0; i < 10; i++)
+    {
+        CreateGame(i*4, "game# " + i, i);
+    }
+
+
+    function cmp(a, b) { return a-b }
+
+    es_update(es, "count", cmp);
+
+
+
+    function dbg(str) { console.log(str); }
+
+</script>
+
+
+</BODY>
+</HTML>

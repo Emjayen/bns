@@ -1,0 +1,343 @@
+/*
+ * chat.cpp
+ *
+ */
+#include "tls.h"
+#include "bns.h"
+
+
+
+
+
+#define WS_SERVER  "connect-bot.classic.blizzard.com" /* 117.52.35.110 */
+#define WS_URI     "/v1/rpc/chat"
+#define WS_PORT    443
+#define WS_REQUEST  packet_bytes
+
+#define BNET_KEY  "04ef54b6be4247f7cfc626a5b0cb5dbeffaf5abbab707a2fee86e97a"
+
+
+
+
+static SOCKET s;
+static tls_ctx ctx;
+
+
+
+uid Recv(void* pDst)
+{
+    uid r;
+
+    LOG("recv()... ");
+
+    if((r = recv(s, (char*) pDst, 0x8000, NULL)) == SOCKET_ERROR || r == 0)
+    {
+        LERR("Server closed connection: 0x%X", r);
+        return 0;
+    }
+
+    return r;
+}
+
+
+uib Connect()
+{
+    byte Buffer[0x10000];
+    byte OutBuffer[0x10000];
+    uid Result = 0;
+    uid RecvBytes = 0;
+    uid OutBytes;
+    sockaddr_in sa;
+
+    sa.sin_family = AF_INET;
+    sa.sin_addr.s_addr = *((uid*) gethostbyname(WS_SERVER)->h_addr_list[0]);
+    sa.sin_port = htons(WS_PORT);
+
+    s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    
+    if(connect(s, (sockaddr*) &sa, sizeof(sa)) == SOCKET_ERROR)
+    {
+        LERR("connect() failed");
+        return FALSE;
+    }
+
+
+    for(;;)
+    {
+        if(!tls_handshake(&ctx, Buffer, &(Result = RecvBytes), OutBuffer, &(OutBytes = sizeof(OutBuffer))))
+        {
+            LERR("tls_handshake() failed");
+            break;
+        }
+
+        LOG("Consumed: %u bytes", Result);
+
+        if((ctx.flags & TLS_CTX_FLAG_HANDSHAKED))
+        {
+            LOG("--------- Handshake complete -----------");
+            return TRUE;
+        }
+
+        RecvBytes -= Result;
+        MoveMemory(Buffer, Buffer+Result, RecvBytes);
+
+        if(OutBytes)
+        {
+            send(s, (const char*) OutBuffer, OutBytes, NULL);
+            LOG("Sent %u handshake data", OutBytes);
+        }
+
+        if(!(Result = Recv(Buffer+RecvBytes)))
+            break;
+
+        RecvBytes += Result;
+
+        LOG("Received %u bytes; total:%u", Result, RecvBytes);
+    }
+
+    return FALSE;
+}
+
+
+uib EncryptSend(const void* pData, uid Bytes)
+{
+    static byte Buffer[0x10000];
+    uid Result;
+
+    memcpy(Buffer+ctx.header_sz, pData, Bytes);
+
+    if(!tls_encrypt(&ctx, Buffer, &(Result = Bytes)))
+    {
+        LERR("tls_encrypt() failed");
+        return FALSE;
+    }
+
+    LOG("Send %u encrypted bytes (plain: %u bytes)", Result, Bytes);
+
+    if(send(s, (const char*) Buffer, Result, NULL) != Result)
+    {
+        LERR("send() failed");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+
+uid DecryptRecv(byte* pDst)
+{
+    static byte Buffer[0x10000];
+    static uid BufferSz;
+
+    for(;;)
+    {
+        byte* pInput = Buffer;
+        uid InOutSz = BufferSz;
+        uid PayloadSz = 0;
+
+        LOG("tls_decrypt with %u bytes", InOutSz);
+
+        if(!tls_decrypt(&ctx, &pInput, &InOutSz, &PayloadSz))
+        {
+            LERR("tls_decrypt() failed");
+            return FALSE;
+        }
+
+        LOG("tls_decrypt(): InSize=%u Consumed=%u PayloadSz=%u", BufferSz, InOutSz, PayloadSz);
+
+        if(PayloadSz)
+        {  
+            memcpy(pDst, pInput, PayloadSz);
+        }
+
+        if(InOutSz)
+        {
+            BufferSz -= InOutSz;
+            MoveMemory(Buffer, Buffer+InOutSz, BufferSz);
+        }
+
+        if(PayloadSz)
+            return PayloadSz;
+        
+
+        if(!(PayloadSz = Recv(Buffer+BufferSz)))
+        {
+            return FALSE;
+        }
+
+        else
+        {
+            BufferSz += PayloadSz;
+        }
+    }
+}
+
+
+uib DoWebsocketHandshake()
+{
+    static const char WS_HANDSHAKE_REQUEST[] = "GET " WS_URI " HTTP/1.1"
+        "\r\nHost: " WS_SERVER
+        "\r\nUpgrade: websocket"
+        "\r\nConnection: Upgrade"
+        "\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ=="
+        "\r\nSec-WebSocket-Protocol: json"
+        "\r\nSec-WebSocket-Version: 13"
+        "\r\n\r\n";
+
+
+    if(!EncryptSend(WS_HANDSHAKE_REQUEST, strlen(WS_HANDSHAKE_REQUEST)))
+        return FALSE;
+
+    char Buffer[0x1000];
+    uid BufferSz = 0;
+    uid Result;
+
+    for(;;)
+    {
+        if(!(Result = DecryptRecv((byte*) Buffer + BufferSz)))
+            return FALSE;
+
+        LOG("Received %u websocket HTTP handshake bytes. Buffer contents: ", Result);
+
+        BufferSz += Result;
+
+        LogHex(Buffer, BufferSz);
+
+       
+
+        if(Buffer[BufferSz-1] == '\n' && Buffer[BufferSz-3] == '\n')
+        {
+            LOG("Found end of HTTP response");
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+
+
+void RecvDumpLoop()
+{
+    static char tmp[0x10000];
+    uid Result;
+
+    for(;;)
+    {
+        if(!(Result = DecryptRecv((byte*) tmp)))
+            return;
+
+        LOG("Dump received (%u):", Result);
+        LogHex(tmp, Result);
+    }
+}
+
+
+void TestBuffer()
+{
+    static byte Buffer[0x10000];
+    uid BufferSz = 0;
+
+    for(uid i = 0; i < 5; i++)
+    {
+        uid Result = Recv(Buffer+BufferSz);
+
+        if(!Result)
+            __asm int 3
+
+        LOG("Buffered: %u (+%u)", BufferSz+Result, Result);
+
+        BufferSz += Result;
+    }
+
+    uid InSize = BufferSz;
+    uid PayloadSz = 0;
+    byte* pData = Buffer;
+
+    if(!tls_decrypt(&ctx, &pData, &InSize, &PayloadSz))
+        __asm int 3
+
+    LOG("tls_decrypt: Input:%u Consumed:%u Payload:%u", BufferSz, InSize, PayloadSz);
+
+    pData = Buffer + InSize;
+    InSize = BufferSz - InSize;
+    PayloadSz = 0;
+
+    if(!tls_decrypt(&ctx, &pData, &InSize, &PayloadSz))
+        __asm int 3
+
+    LOG("tls_decrypt: Input:%u Consumed:%u Payload:%u", BufferSz, InSize, PayloadSz);
+}
+
+
+void DoTest()
+{
+    if(!Connect())
+    {
+        LERR("Connect() failed");
+        return;
+    }
+
+    if(!DoWebsocketHandshake())
+    {
+        LERR("WS handshake failed");
+        return;
+    }
+
+    unsigned char ws_capi_auth[148] = {
+        0x81, 0xFE, 0x00, 0x8C, 0x38, 0x3D, 0x0A, 0xDA, 0x43, 0x1F, 0x69, 0xB5,
+        0x55, 0x50, 0x6B, 0xB4, 0x5C, 0x1F, 0x30, 0xF8, 0x7A, 0x52, 0x7E, 0xBB,
+        0x48, 0x54, 0x6B, 0xAF, 0x4C, 0x55, 0x24, 0x9B, 0x4D, 0x49, 0x62, 0xBF,
+        0x56, 0x49, 0x63, 0xB9, 0x59, 0x49, 0x6F, 0x88, 0x5D, 0x4C, 0x7F, 0xBF,
+        0x4B, 0x49, 0x28, 0xF6, 0x1A, 0x4F, 0x6F, 0xAB, 0x4D, 0x58, 0x79, 0xAE,
+        0x67, 0x54, 0x6E, 0xF8, 0x02, 0x0C, 0x26, 0xF8, 0x48, 0x5C, 0x73, 0xB6,
+        0x57, 0x5C, 0x6E, 0xF8, 0x02, 0x46, 0x28, 0xBB, 0x48, 0x54, 0x55, 0xB1,
+        0x5D, 0x44, 0x28, 0xE0, 0x1A, 0x0D, 0x3E, 0xBF, 0x5E, 0x08, 0x3E, 0xB8,
+        0x0E, 0x5F, 0x6F, 0xEE, 0x0A, 0x09, 0x3D, 0xBC, 0x0F, 0x5E, 0x6C, 0xB9,
+        0x0E, 0x0F, 0x3C, 0xBB, 0x0D, 0x5F, 0x3A, 0xB9, 0x5A, 0x08, 0x6E, 0xB8,
+        0x5D, 0x5B, 0x6C, 0xBB, 0x5E, 0x08, 0x6B, 0xB8, 0x5A, 0x5C, 0x68, 0xED,
+        0x08, 0x0A, 0x6B, 0xE8, 0x5E, 0x58, 0x6F, 0xE2, 0x0E, 0x58, 0x33, 0xED,
+        0x59, 0x1F, 0x77, 0xA7
+    };
+
+    unsigned char ws_capi_connect[73] = {
+        0x81, 0xC3, 0xE9, 0x07, 0x2E, 0x6D, 0x92, 0x25, 0x4D, 0x02, 0x84, 0x6A,
+        0x4F, 0x03, 0x8D, 0x25, 0x14, 0x4F, 0xAB, 0x68, 0x5A, 0x0C, 0x99, 0x6E,
+        0x4D, 0x05, 0x88, 0x73, 0x00, 0x2E, 0x86, 0x69, 0x40, 0x08, 0x8A, 0x73,
+        0x7C, 0x08, 0x98, 0x72, 0x4B, 0x1E, 0x9D, 0x25, 0x02, 0x4F, 0x9B, 0x62,
+        0x5F, 0x18, 0x8C, 0x74, 0x5A, 0x32, 0x80, 0x63, 0x0C, 0x57, 0xDB, 0x2B,
+        0x0C, 0x1D, 0x88, 0x7E, 0x42, 0x02, 0x88, 0x63, 0x0C, 0x57, 0x92, 0x7A,
+        0x53
+    };
+
+
+    static char Buffer[0x10000];
+    uid BufferSz = 0;
+
+
+    if(!EncryptSend(ws_capi_auth, sizeof(ws_capi_auth)))
+        return;
+
+    LOG("Sent CAPI 'auth' request");
+
+    Sleep(1000);
+
+    LOG("Sent CAPI 'connect' request");
+
+    if(!EncryptSend(ws_capi_connect, sizeof(ws_capi_connect)))
+        return;
+
+    TestBuffer();
+
+
+    RecvDumpLoop();
+    
+}
+
+void ChatTest()
+{
+    uib r;
+
+    DoTest();
+    r = r;
+}

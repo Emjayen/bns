@@ -1,0 +1,45 @@
+
+
+// -- East -- 
+bns-exsnn // done 
+bns-exsnx // done
+bns-exsnh // done
+
+bns-exsln // done
+bns-exslx // done
+bns-exslh // done
+
+// EAST, hardcore and classic normal
+bns-exhnn // done
+bns-exhln // done
+bns-echln // done
+bns-echnn // done
+
+
+
+
+// -- West --
+bns-wxsln // done
+bns-wxslx // done
+bns-wxslh // done
+
+bns-wxsnn // done
+bns-wxsnx // done
+bns-wxsnh // done
+
+// WEST, hardcore normal
+bns-wxhnn // done
+bns-wxhln // done
+// todo: classic
+
+bns-uxsln // done
+bns-uxslx // done
+bns-uxslh // done
+     
+bns-uxsnn // done
+bns-uxsnx // done
+bns-uxsnh // done
+
+// EUROPE, hardcore normal
+bns-uxhln // done
+bns-uxhnn // done

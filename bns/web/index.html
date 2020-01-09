@@ -1,0 +1,572 @@
+<html>
+<head>
+    <title>BNS</title>
+    <link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Titillium+Web&display=swap" rel="stylesheet">
+
+
+    <style>
+
+
+        body
+        {
+            background-color: #000000;
+            color: #FFFFFF;
+            padding-top: 20px;
+        }
+
+        .page
+        {
+            font-family: Montserrat;
+            background-color: #010A0E;
+            margin-left: auto;
+            margin-right: auto;
+            width: 540px;
+            padding: 0 8px 60px 8px;
+        }
+
+        table
+        {
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        th
+        {
+            padding-left: 1em;
+            font-size: 15px;
+            font-weight: normal;
+        }
+
+        td
+        {
+            font-family: 'Titillium Web', sans-serif;
+            font-size: 16px;
+            padding-top: 2px;
+            padding-bottom: 2px;
+            padding-left: 1em;
+        }
+
+        .gdesc
+        {
+            font-weight: normal;
+            font-size: 11px;
+            color: #CECBCB;
+            word-wrap: break-word;
+        }
+
+    </style>
+</head>
+
+<body>
+    <div class="page">
+
+
+
+
+        <br />
+        <br />
+
+        <div id="flt" style="width: 300px; margin: 0 auto 0 auto">
+            <select onchange="UpdateInputState();" id="realm" style="font-family: inherit; font-size: 14px; background-color: #010A0E; color: inherit; width: 100px; border-color: #5A5757; margin-left: 90px;">
+                <option name="fltopt" value="0">US East</option>
+                <option name="fltopt" value="1">US West</option>
+                <option name="fltopt" value="2">Europe</option>
+                <option name="fltopt" value="3">Asia</option>
+            </select>
+            <br /><br />
+
+            <div style="float:right">
+                <input onchange="UpdateInputState();" name="fltopt" type="radio" />Normal<br />
+                <input onchange="UpdateInputState();" name="fltopt" type="radio" id="diff_nm" />Nightmare<br />
+                <input onchange="UpdateInputState();" name="fltopt" type="radio" id="diff_hell" />Hell<br />
+            </div>
+
+            <input onchange="UpdateInputState();" name="fltopt" id="prod" type="checkbox" />Expansion<br />
+            <input onchange="UpdateInputState();" name="fltopt" id="lad" type="checkbox" />Ladder<br />
+            <input onchange="UpdateInputState();" name="fltopt" id="core" type="checkbox" />Hardcore<br />
+
+            <br />
+            <button id="submit_fetch" style="margin-left: 90px;" onclick="FetchGameList();">Show Games</button>
+        </div>
+
+        <br />
+        <p id="status" style="text-align:center; font-size: 12px"></p>
+
+
+        <br /><br />
+        <table cellpadding="0" cellspacing="0" style="width: 100%; table-layout: fixed">
+            <thead>
+                <tr style="height: 30px; text-align: left; background-color: #172536">
+                    <th style="width: 200px">Name</th>
+                    <th>Population</th>
+                    <th>Duration</th>
+                    <th>Rating</th>
+                </tr>
+            </thead>
+
+            <tbody id="bah">
+            <tr>
+                <td>Some baal-33<div class="gdesc"></div></td>
+                <td>Medium</td>
+                <td>2:34 <sup>σ 6</sup></td>
+                <td>A</td>
+            </tr>
+
+
+            </tbody>
+        </table>
+
+        <br /><br />
+
+        <table cellpadding="0" cellspacing="0" style="width: 100%; table-layout: fixed">
+            <thead>
+                <tr style="height: 30px; text-align: left; background-color: #172536">
+                    <th style="width: 200px">Name</th>
+                    <th>Created</th>
+                    <th>Players</th>
+                </tr>
+            </thead>
+
+            <tbody id="gtbl">
+                <!--<tr>
+                <td>Some baal-33<div class="gdesc"></div></td>
+                <td>11:14 PM</td>
+                <td>5</td>
+            </tr>
+
+            <tr>
+                <td>O X for spirit</td>
+                <td>11:34 PM</td>
+                <td>5</td>
+            </tr>-->
+            </tbody>
+        </table>
+
+    </div>
+
+
+
+
+
+
+<script>
+
+    // BSP messages
+    const BSP_FETCH_LIST=0x02;
+    const BSP_GAME_STATE=0x10;
+    const BSP_GAME_OPEN=0x11;
+    const BSP_GAME_CLOSE=0x12;
+    const BSP_GAME_UPDATE=0x13;
+    const BSP_GAME_PADD=0x14;
+    const BSP_GAME_PREM=0x15;
+
+    // BSP status codes
+    const BSP_STATUS_SUCCESS=0x00;
+    const BSP_STATUS_FAIL=0x01;
+    const BSP_STATUS_INVALID=0x02;
+    const BSP_STATUS_NOT_FOUND=0x03;
+    const BSP_STATUS_TRY_AGAIN=0x04;
+
+    // Game type flags
+    const GT_NM_BIT   = 0;
+    const GT_HELL_BIT = 1;
+    const GT_LAD_BIT  = 2;
+    const GT_CORE_BIT = 3;
+    const GT_PROD_BIT = 4;
+    const GT_FLAG_EXPANSION = (1<<GT_PROD_BIT);
+    const GT_FLAG_HARDCORE  = (1<<GT_CORE_BIT);
+    const GT_FLAG_LADDER    = (1<<GT_LAD_BIT);
+    const GT_REALM_MASK     = 0x60;
+
+    // States
+    const STATE_DISCONNECTED = 0;
+    const STATE_CONNECTED = 1;
+    const STATE_PENDING = 2;
+
+    // Constants
+    const ACTIVE_MODE_UNDEFINED = 0x80;
+    const ACTIVE_MODE_INVALID = 0x81;
+    const RECONNECT_TIMEOUT = 12000;
+    const FETCH_TIMEOUT = 4000;
+
+    // debugging
+    const dbgout = 1;
+
+    // Globals
+    var ws;
+    var State;
+    var ActiveMode = ACTIVE_MODE_INVALID;
+    var LocalMode;
+
+    var host=location.hostname? location.hostname:"localhost";
+
+    dbg("host: "+host);
+
+
+    WsConnect();
+
+    function UpdateInputState()
+    {
+        LocalMode = DownloadModeFilter();
+
+        if(ActiveMode == ACTIVE_MODE_INVALID)
+        {
+            EnableModeInput(false);
+            GetElement("submit_fetch").disabled = true;
+            return;
+        }
+
+        EnableModeInput(true);
+        GetElement("submit_fetch").disabled = (ActiveMode == LocalMode);
+    }
+
+    function SetActiveMode(mode)
+    {
+        GetElement("gtbl").innerHTML="";
+        ActiveMode = mode;
+        UpdateInputState();
+    }
+
+    function SetInputMode(mode)
+    {
+        GetElement("prod").checked = (mode & GT_FLAG_EXPANSION);
+        GetElement("core").checked = (mode & GT_FLAG_HARDCORE);
+        GetElement("lad").checked = (mode & GT_FLAG_LADDER);
+        GetElement("realm").selectedIndex = ((mode>>5) & 3);
+    }
+
+    function DownloadModeFilter()
+    {
+        var mode = 0;
+
+        mode |= (GetElement("prod").checked << GT_PROD_BIT);
+        mode |= (GetElement("core").checked << GT_CORE_BIT);
+        mode |= (GetElement("lad").checked << GT_LAD_BIT);
+        mode |= (GetElement("diff_nm").checked << GT_NM_BIT);
+        mode |= (GetElement("diff_hell").checked << GT_HELL_BIT);
+        mode |= (GetElement("realm").selectedIndex << 5);
+
+        return mode;
+    }
+
+
+    function EnableModeInput(enabled)
+    {
+        var flt = document.getElementsByName("fltopt");
+
+        for(var i = 0; i < flt.length; i++)
+        {
+            flt[i].disabled = !enabled;
+        }
+    }
+
+    function OnFetchTimeout()
+    {
+        if(ActiveMode == ACTIVE_MODE_INVALID)
+        {
+            SetStatusMsg("Request timed out.");
+            SetActiveMode(ACTIVE_MODE_UNDEFINED);
+        }
+    }
+
+    function FetchGameList()
+    {
+        SetActiveMode(ACTIVE_MODE_INVALID);
+        setTimeout(OnFetchTimeout, FETCH_TIMEOUT);
+        
+        var FetchMsg = new Uint8Array(2);
+        FetchMsg[0] = BSP_FETCH_LIST;
+        FetchMsg[1] = DownloadModeFilter();
+
+        dbg("Mode selected: " + FetchMsg[1]);
+
+        ws.send(FetchMsg);
+    }
+    
+
+    function CheckGameExists(game_id)
+    {
+        var ele;
+
+        if(!GetElement(game_id))
+        {
+            var row=CreateElement("tr",game_id);
+
+            var ele_td = CreateElement("td");
+            var ele_name = CreateElement("span", game_id+"_"+"name");
+            var ele_desc = CreateElement("div",game_id+"_"+"desc");
+
+            ele_desc.className = "gdesc";
+
+            ele_td.appendChild(ele_name);
+            ele_td.appendChild(ele_desc);          
+ 
+            row.appendChild(ele_td);
+            row.appendChild(CreateElement("td",game_id+"_"+"uptime"));
+            row.appendChild(CreateElement("td",game_id+"_"+"pcount"));
+
+            GetElement("gtbl").appendChild(row);
+         
+        }
+    }
+
+    function SetGameProp(game_id,prop,value)
+    {
+        GetElement(game_id+"_"+prop).innerText=value;
+    }
+
+
+    function BSP_ProcessGameDesc(game_id,dv)
+    {
+        var off=0;
+        var tmp;
+        var game_name=read_str(dv,off+1,(tmp=read_uib(dv,off))); off+=1+tmp;
+        var game_desc=read_str(dv,off+1,(tmp=read_uib(dv,off))); off+=1+tmp;
+
+
+        dbg("game_desc: ");
+        dbg("  game_name: "+game_name);
+        dbg("  game_desc: "+game_desc);
+
+        SetGameProp(game_id,"name", game_name);
+        SetGameProp(game_id, "desc", game_desc);
+        return off;
+    }
+
+    function BSP_ProcessGameDescEx(game_id,dv)
+    {
+        var off=0;
+        var max_players=read_uib(dv,off); off+=1;
+        var cur_players=read_uib(dv,off); off+=1;
+        var clvl_diff=read_uib(dv,off); off+=1;
+        var dt_uptime=new Date(Date.now()-(read_uib(dv,off)*1000)); off+=1;
+
+        dbg("game_desc_ex: ");
+        dbg("  max_players: " +max_players);
+        dbg("  cur_players: " +cur_players);
+        dbg("  clvl_diff:   " +clvl_diff);
+        dbg("  dt_uptime:   " +dt_uptime);
+
+        SetGameProp(game_id,"pcount", cur_players + "/" + max_players);
+        SetGameProp(game_id,"uptime", FmtTime(dt_uptime));
+
+        return off;
+    }
+
+//    struct bsp_char_desc
+//{
+//    uid char_id;
+//    uib clvl;
+//    uib cls;
+//    uib dt_join;
+//    uib name_len;
+//    char name[]; /* Pascal string */
+//};
+
+    function BSP_ProcessCharDesc(game_id, dv)
+    {
+        var off = 0;
+        var tmp;
+        var char_id = read_uid(dv,off); off+=4;
+        var clvl = read_uib(dv, off); off+=1;
+        var cls = read_uib(dv, off); off+=1;
+        var dt_join = new Date(Date.now()-(read_uib(dv,off)*1000)); off+=1;
+        var name = read_str(dv,off+1,(tmp=read_uib(dv,off))); off+=1+tmp;
+
+        dbg("char desc:");
+        dbg("  name:    " + name);
+        dbg("  char_id: " + char_id);
+        dbg("  clvl:    " + clvl);
+        dbg("  cls:     " + cls);
+        dbg("  dt_join: " + FmtTime(dt_join));
+
+        return off;
+    }
+
+
+    function WsConnect()
+    {
+        ws = new WebSocket("ws://"+host+":1504");
+        ws.binaryType="arraybuffer";
+        ws.onmessage = WsOnReceive;
+        ws.onclose = WsOnClose;
+        ws.onopen = WsOnConnect;
+
+        SetStatusMsg("Connecting.. ");
+        SetActiveMode(ACTIVE_MODE_INVALID);
+    }
+
+
+    function WsOnConnect(evt)
+    {
+        dbg("BSP connected");
+        SetActiveMode(ACTIVE_MODE_UNDEFINED);
+        SetStatusMsg("");
+    }
+
+    function WsOnClose(evt)
+    {
+        dbg("BSP disconnected");
+        SetActiveMode(ACTIVE_MODE_INVALID);
+        SetStatusMsg("Disconnected. Reconnecting in " + RECONNECT_TIMEOUT/1000 + " seconds");
+        setTimeout(WsConnect, RECONNECT_TIMEOUT);
+    }
+
+    function WsOnReceive(evt)
+    {
+        var dv=new DataView(evt.data);
+        var off=0;
+
+        while(off<dv.byteLength)
+        {
+            var mid=read_uib(dv,off); off+=1;
+
+            dbg("Received message: "+mid);
+
+
+            if(mid==BSP_FETCH_LIST)
+            {
+                var status=read_uib(dv,off); off+=1;
+                var type=read_uib(dv,off); off+=1;
+
+                dbg("Got BSP_FETCH_LIST. Status:"+status+" Type:"+type);
+
+                if(status != BSP_STATUS_NOT_FOUND)
+                {
+                    SetActiveMode(type);
+
+                    if(status == BSP_STATUS_TRY_AGAIN)
+                        SetStatusMsg("Data for this mode will appear when it becomes available.");
+
+                    else
+                        SetStatusMsg("");
+                }
+
+                else
+                {
+                    SetActiveMode(ACTIVE_MODE_UNDEFINED);
+                    SetStatusMsg("The selected mode is currently not supported.")
+                }
+            }
+
+            else if(ActiveMode < ACTIVE_MODE_UNDEFINED)
+            {
+
+                if(mid==BSP_GAME_STATE)
+                {
+                    var game_id=read_uiw(dv,off); off+=2;
+
+                    CheckGameExists(game_id);
+                    off+=BSP_ProcessGameDescEx(game_id,new DataView(evt.data,off));
+                    off+=BSP_ProcessGameDesc(game_id,new DataView(evt.data,off));
+
+                    var char_count = read_uib(dv, off); off += 1;
+
+                    dbg("char_count: " + char_count);
+
+                    while(char_count--)
+                        off += BSP_ProcessCharDesc(game_id, new DataView(evt.data, off));
+                }
+
+                else if(mid==BSP_GAME_OPEN)
+                {
+                    var game_id=read_uiw(dv,off); off+=2;
+
+                    CheckGameExists(game_id);
+                    off+=BSP_ProcessGameDesc(game_id,new DataView(evt.data,off));
+                }
+
+                else if(mid==BSP_GAME_UPDATE)
+                {
+                    var game_id=read_uiw(dv,off); off+=2;
+
+                    CheckGameExists(game_id);
+                    off+=BSP_ProcessGameDescEx(game_id,new DataView(evt.data,off));
+                }
+
+                else if(mid==BSP_GAME_CLOSE)
+                {
+                    var game_id=read_uiw(dv,off); off+=2;
+
+                    dbg("game close: "+game_id);
+                    GetElement(game_id).remove();
+                }
+
+                else if(mid == BSP_GAME_PADD)
+                {
+                    var game_id=read_uiw(dv,off); off+=2;
+
+                    off += BSP_ProcessCharDesc(game_id, new DataView(evt.data, off));
+                }
+
+                else if(mid == BSP_GAME_PREM)
+                {
+                    var game_id=read_uiw(dv,off); off+=2;
+                    var char_id=read_uid(dv,off); off+=4;
+
+                    dbg("["+game_id+"] Player leave: " + char_id);
+
+                }
+
+                else
+                    dbg("Received unknown BSP message: "+mid);
+           }
+        }
+    }
+
+
+    // Helpers/wrappers
+    function read_uib(dv,off) { return dv.getUint8(off,true); }
+    function read_uiw(dv,off) { return dv.getUint16(off,true); }
+    function read_uid(dv,off) { return dv.getUint32(off,true); }
+    function read_str(dv,off,len) { return String.fromCharCode.apply(null,new Uint8Array(dv.buffer,dv.byteOffset+off,len)); }
+
+    function SetStatusMsg(str) { GetElement("status").innerText = str; }
+
+    function FmtTime(dt)
+    {
+        return ((dt.getHours() + 11) % 12 + 1) + ":" + ('0' + dt.getMinutes()).slice(-2) + (dt.getHours() >= 12 ? "pm" : "am");
+    }
+
+    function CreateElement(tag,id)
+    {
+        var ele=document.createElement(tag);
+        ele.id=id;
+        return ele;
+    }
+
+    function GetElement(id) { return document.getElementById(id); }
+
+    function dbg(str)
+    {
+        if(dbgout)
+            console.log(str)
+    }
+
+</script>
+
+
+
+    <!--<div>Mode: <input id="mode" style="width:50px" type="text" /> <input value="Set" type="button" onclick="SetMode();" /></div>
+
+    <div id="out"></div>
+    <br /><br />
+    <table>
+        <thead>
+            <tr>
+                <td>Name</td>
+                <td>Desc</td>
+                <td>max_player</td>
+                <td>host_clvl</td>
+                <td>clvl_range</td>
+                <td>uptime</td>
+            </tr>
+        </thead>
+
+        <tbody id="gtbl">
+        </tbody>
+    </table>-->
+
+</body>
+</html>
