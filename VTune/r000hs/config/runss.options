@@ -1,0 +1,16 @@
+-r
+C:\Users\Toshino\Documents\Amplifier XE\Projects\bns\r000hs
+--stack-stitching
+--data-limit-mb=500
+--disk-space-limit=100
+--mrte-type=java,dotnet,python
+--itt-config=frame
+--stackwalk=offline
+--type=cswitch
+--mrte-mode=auto
+--type=cpu:counters:nostack
+--type=cpu:stack
+--interval=2
+--
+C:\Services\bns\bns.exe
+-profile

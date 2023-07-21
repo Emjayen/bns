@@ -24,7 +24,7 @@ uib SyslogStartup(const char* pFilename)
     if((hLog = CreateFile("bns.log", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_ALWAYS, NULL, NULL)) == INVALID_HANDLE_VALUE)
         return FALSE;
 
-    if(SetFilePointer(hLog, 0, NULL, FILE_END) == INVALID_SET_FILE_POINTER)
+    if(!SetFilePointerEx(hLog, { 0,0 }, NULL, FILE_END))
         return FALSE;
 
 #ifdef ENABLE_CONOUT

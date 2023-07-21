@@ -161,9 +161,16 @@ static DWORD WINAPI Entry()
 	LOG("  Working: %s", Path);
 	LOG("");
 
-#ifdef DEBUG
+#ifndef BUILD_SVC
 	return AppEntry();
 #endif
+
+	if(strstri(GetCommandLine(), "-profile"))
+	{
+		LOG("Profiling mode.");
+
+		return AppEntry();
+	}
 
 	if(!strstri(GetCommandLine(), SVC_CFG_ARG))
 	{
@@ -329,7 +336,7 @@ static LONG WINAPI HandleException(_EXCEPTION_POINTERS* pException)
 
 
 	// Create dump file.
-	wsprintf(Path, SVC_CFG_NAME "-%u.dmp", GetTickCount());
+	wsprintf(Path, "crashdump\\" SVC_CFG_NAME "-%u.dmp", GetTickCount());
 
 	if((hFile = CreateFile(Path, GENERIC_ALL, NULL, NULL, CREATE_ALWAYS, NULL, NULL)) == INVALID_HANDLE_VALUE)
 	{
@@ -342,7 +349,7 @@ static LONG WINAPI HandleException(_EXCEPTION_POINTERS* pException)
 	mdei.ExceptionPointers = pException;
 	mdei.ClientPointers = FALSE;
 
-	if(!MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, MiniDumpWithHandleData, &mdei, NULL, NULL))
+	if(!MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, MiniDumpWithFullMemory, &mdei, NULL, NULL))
 	{
 		LERR("Failed to generate crash dump");
 	}

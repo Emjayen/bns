@@ -7,16 +7,28 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bns", "bns\bns.vcxproj", "{
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		DbgSvc|x64 = DbgSvc|x64
+		DbgSvc|x86 = DbgSvc|x86
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
+		Deploy_Debug|x64 = Deploy_Debug|x64
+		Deploy_Debug|x86 = Deploy_Debug|x86
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.DbgSvc|x64.ActiveCfg = DbgSvc|x64
+		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.DbgSvc|x64.Build.0 = DbgSvc|x64
+		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.DbgSvc|x86.ActiveCfg = DbgSvc|Win32
+		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.DbgSvc|x86.Build.0 = DbgSvc|Win32
 		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.Debug|x64.ActiveCfg = Debug|x64
 		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.Debug|x64.Build.0 = Debug|x64
 		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.Debug|x86.ActiveCfg = Debug|Win32
 		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.Debug|x86.Build.0 = Debug|Win32
+		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.Deploy_Debug|x64.ActiveCfg = Deploy_Debug|x64
+		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.Deploy_Debug|x64.Build.0 = Deploy_Debug|x64
+		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.Deploy_Debug|x86.ActiveCfg = Deploy_Debug|Win32
+		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.Deploy_Debug|x86.Build.0 = Deploy_Debug|Win32
 		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.Release|x64.ActiveCfg = Release|x64
 		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.Release|x64.Build.0 = Release|x64
 		{06BB2BC8-0005-4F25-97EF-0EDCA8545AE2}.Release|x86.ActiveCfg = Release|Win32

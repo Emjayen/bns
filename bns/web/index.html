@@ -1,12 +1,11 @@
-<html>
+﻿<html>
 <head>
     <title>BNS</title>
     <link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Titillium+Web&display=swap" rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css?family=Inconsolata&display=swap" rel="stylesheet">
 
     <style>
-
 
         body
         {
@@ -21,8 +20,15 @@
             background-color: #010A0E;
             margin-left: auto;
             margin-right: auto;
-            width: 540px;
-            padding: 0 8px 60px 8px;
+            width: 1000px;
+            padding-bottom: 40px;
+            font-size: 12px;
+        }
+
+        .section
+        {
+            padding-top: 35px;
+            margin: 8px 8px 8px 8px;
         }
 
         table
@@ -31,23 +37,30 @@
             margin-right: auto;
         }
 
-        th
-        {
-            padding-left: 1em;
-            font-size: 15px;
-            font-weight: normal;
-        }
 
         td
         {
             font-family: 'Titillium Web', sans-serif;
             font-size: 16px;
-            padding-top: 2px;
-            padding-bottom: 2px;
-            padding-left: 1em;
+            height: 30px;
+            padding: 2px 0px 2px 6px;
+            border-bottom: solid;
+            border-width: 1px;
+            border-color: #031923;
+            overflow: hidden;
         }
 
-        .gdesc
+        th
+        {
+            padding-left: 8px;
+            font-size: 15px;
+            font-weight: normal;
+            height: 30px; 
+            text-align: left; 
+            background-color: #172536;
+        }
+
+        .game_desc
         {
             font-weight: normal;
             font-size: 11px;
@@ -55,20 +68,129 @@
             word-wrap: break-word;
         }
 
+        .game_max_players
+        {
+            vertical-align: top;
+            font-size: 10px;
+            color: #CECBCB;
+            padding-left: 3px;
+        }
+
+        .run_duration_stddev
+        {
+            font-size: 10px;
+            vertical-align: top;
+            padding-left: 2px;
+        }
+
+        .pinf
+        {
+            display:inline-block;
+            width: 25%;
+            font-size: 12px;  
+        }
+
+        .pinf span
+        {
+            display: inline-block;
+            overflow: hidden;
+        }
+
+        .pinf .character_name
+        {
+            width: 100px;
+        }
+
+        .pinf span:nth-child(1)
+        {
+            width: 10px;
+            font-family: Inconsolata;
+            vertical-align: top;
+            margin-top: 4px;
+        }
+
+        .pinf span:nth-child(2)
+        {
+            width: 18px;
+            color: #B3ACD1;
+            font-family: Inconsolata;
+            vertical-align: top;
+            margin-top: 4px;
+        }
+
+        .nav {}
+
+        .nav:hover
+        {
+            cursor: pointer;
+            color: #B1BBC0;
+        }
+
+        .navmain
+        {
+            text-align: center;
+            font-size: 18px;
+
+        }
+
+        .navlabel
+        {
+            display: inline-block;
+            padding-left: 8px;
+            padding-right: 8px;
+        }
+
+        hr
+        {
+            border: none;
+            height: 1px;
+            color: white;
+            background-color: #031923;
+        }
+
+        p
+        {
+            font-size: 12px;
+        }
+
+        .userinput
+        {
+            font-family: Verdana;
+            font-size: 13px;
+            background-color: #031923;
+            color: inherit;
+        }
+
+        h5
+        {
+            font-weight: normal;
+            font-size: 14px;
+        }
+
+
     </style>
 </head>
 
 <body>
     <div class="page">
 
+    <div id="navmain" class="navmain">
+    </div>
+    <hr />
 
+    <div style="padding: 2px 4px 8px 8px; margin-top: 16px; margin-left: auto; margin-right: auto; width:80%; border: solid; border-color: #031923; border-width: 1px">
+        <div style="width: 100%; text-align: center; font-size: 16px">Notice</div>
+        
+        <p style="font-size: 11px">
+            <sup>21:00 25-June (UTC)</sup><br /><br />
+            BNS is temporarily unavailable. Restoration time may be up to two weeks.
 
+        </p>
+    </div>
 
-        <br />
-        <br />
-
+    <div id="Home" class="section">
         <div id="flt" style="width: 300px; margin: 0 auto 0 auto">
-            <select onchange="UpdateInputState();" id="realm" style="font-family: inherit; font-size: 14px; background-color: #010A0E; color: inherit; width: 100px; border-color: #5A5757; margin-left: 90px;">
+            <select onchange="UpdateInputState();" id="realm" style="font-family: inherit; font-size: 14px; background-color: #010A0E; color: inherit; width: 100px; border-color: #5A5757; margin-left: 90px">
                 <option name="fltopt" value="0">US East</option>
                 <option name="fltopt" value="1">US West</option>
                 <option name="fltopt" value="2">Europe</option>
@@ -76,7 +198,7 @@
             </select>
             <br /><br />
 
-            <div style="float:right">
+            <div style="float: right">
                 <input onchange="UpdateInputState();" name="fltopt" type="radio" />Normal<br />
                 <input onchange="UpdateInputState();" name="fltopt" type="radio" id="diff_nm" />Nightmare<br />
                 <input onchange="UpdateInputState();" name="fltopt" type="radio" id="diff_hell" />Hell<br />
@@ -95,53 +217,154 @@
 
 
         <br /><br />
-        <table cellpadding="0" cellspacing="0" style="width: 100%; table-layout: fixed">
+
+        <!-- Runs -->
+        <table cellpadding="0" cellspacing="0" style="width: 75%; table-layout: fixed">
             <thead>
-                <tr style="height: 30px; text-align: left; background-color: #172536">
-                    <th style="width: 200px">Name</th>
+                <tr>
+                    <th style="width: 110px">Type</th>
+                    <th style="width: 200px">Game</th>
+                    <th style="width: 80px">Started</th>
+                    <th style="width: 80px">Players</th>
+                    <th style="width: 80px">Duration</th>
                     <th>Population</th>
-                    <th>Duration</th>
-                    <th>Rating</th>
                 </tr>
             </thead>
 
-            <tbody id="bah">
-            <tr>
-                <td>Some baal-33<div class="gdesc"></div></td>
-                <td>Medium</td>
-                <td>2:34 <sup>σ 6</sup></td>
-                <td>A</td>
-            </tr>
+            <tbody id="rtbl">
+                <tr>
+                    <td>Chaos, Baal</td>
+                    <td>Some CBaal-2</td>
+                    <td>11:21AM</td>
+                    <td>3</td>
+                    <td>2:21 σ 4</td>
+                    <td>4</td>
+                </tr>
 
-
+                <tr>
+                    <td>Chaos, Baal</td>
+                    <td>Some CBaal-2</td>
+                    <td>11:21AM</td>
+                    <td>3</td>
+                    <td>2:21 σ 4</td>
+                    <td>4</td>
+                </tr>
             </tbody>
         </table>
 
         <br /><br />
 
+        <!-- Games -->
+        <div style="width: 100%; text-align: right; padding-bottom: 4px">
+        <span style="display: inline-block"><input type="checkbox" onclick="bHideRuns=this.checked; SortGames();" />Hide runs</span>
+        </div>
+
         <table cellpadding="0" cellspacing="0" style="width: 100%; table-layout: fixed">
             <thead>
-                <tr style="height: 30px; text-align: left; background-color: #172536">
+                <tr>
                     <th style="width: 200px">Name</th>
-                    <th>Created</th>
-                    <th>Players</th>
+                    <th style="width: 80px"  class="nav" onclick="SetGameSort('ts_created');">Created</th>
+                    <th style="width: 110px">Host</th>
+                    <th class="nav" onclick="SetGameSort('cur_players');">Players</th>
                 </tr>
             </thead>
 
             <tbody id="gtbl">
-                <!--<tr>
-                <td>Some baal-33<div class="gdesc"></div></td>
-                <td>11:14 PM</td>
-                <td>5</td>
-            </tr>
+                <tr>
+                    <td>Some baal-33<div class="gdesc"></div></td>
+                    <td>11:14 PM</td>
+                    <td>Emjayen</td>
+                    <td id="test"></td>
+                </tr>
 
             <tr>
                 <td>O X for spirit</td>
                 <td>11:34 PM</td>
+                <td>Emjayen</td>
                 <td>5</td>
-            </tr>-->
+            </tr>
             </tbody>
         </table>
+
+    </div>
+
+    <div id="Updates" class="section">
+
+        <h5>15-May 2020</h5>
+        <p>
+            <ul>
+            <li>Provisioned more resources in anticipation of the upcoming ladder reset.</li>
+            <li>Data for all mode permutations of normal difficulty now available.</li>
+            <li>Fixed crash-bug (hopefully). Daily restart workaround disabled.</li>
+            </ul>
+        </p>
+
+        <h5>13-May 2020</h5>
+        <p>
+            <ul>
+            <li>Fixed issue where some runs were incorrectly identified.</li>
+            <li>Miscellaneous runs are now handled.</li>
+            </ul>
+        </p>
+
+        <h5>12-May 2020</h5>
+        <p>
+            <ul>
+            <li>Fixed a bug where BNS would fail to indicate if data is temporarily unavailable.</li>
+            </ul>
+        </p>
+
+        <h5>16-March 2020</h5>
+        <p>
+            <ul>
+            <li>Implemented temporary workaround for some issues.</li>
+            </ul>
+        </p>
+
+        <h5>16-Feb 2020</h5>
+        <p>
+            <ul>
+            <li>Fixed a crash-bug.</i>
+            </ul>
+        </p>
+
+        <h5>15-Jan 2020</h5>
+        <p>
+            <ul>
+            <li>Preliminary run tracking has been added.</li>
+            <li>Added display filtering option for run-type games.</li>
+            <li>Game host identification should be more accurate now.</li>
+            <li>Data for additional modes will be made available soon™</li>
+            </ul>
+        </p>
+
+        <h5>12-Jan 2020</h5>
+        <p>
+            <ul>
+            <li>Player information for games is now available.</li>
+            <li>The game-list may now be sorted by game creation time or player count.</li>
+            <li>Game creation time accuracy fixed.</li>
+            </ul>
+        </p>
+    </div>
+
+    <div id="Feedback" class="section">
+        
+        <div style="margin-left: auto; margin-right: auto; width: 600px; text-align: center">
+        <p style="text-align: left">Use the following form to leave bug reports, suggestions, comments, ect.
+            
+            <br /><br />Yes, feedback is read; if you wish for a reply however you'll need to specify a contact method.
+            </p>
+            
+            <br />
+        <textarea id="feedback_text" class="userinput" style="padding-left: 2px; padding-top: 4px; margin-bottom: 20px" cols="80" rows="20"></textarea>
+        <br />
+            
+        <div><button id="feedback_btn" onclick="SubmitFeedback();">Submit</button></div>
+        <br />
+        <div id="feedback_status"></div>
+        </div>
+    </div>
 
     </div>
 
@@ -153,13 +376,17 @@
 <script>
 
     // BSP messages
-    const BSP_FETCH_LIST=0x02;
-    const BSP_GAME_STATE=0x10;
-    const BSP_GAME_OPEN=0x11;
-    const BSP_GAME_CLOSE=0x12;
-    const BSP_GAME_UPDATE=0x13;
-    const BSP_GAME_PADD=0x14;
-    const BSP_GAME_PREM=0x15;
+    const BSP_FETCH_LIST   = 0x02;
+    const BSP_RESOLVE_CHAR = 0x03;
+    const BSP_FEEDBACK     = 0x05;
+    const BSP_GAME_STATE   = 0x10;
+    const BSP_GAME_OPEN    = 0x11;
+    const BSP_GAME_CLOSE   = 0x12;
+    const BSP_GAME_UPDATE  = 0x13;
+    const BSP_GAME_PADD    = 0x14;
+    const BSP_GAME_PREM    = 0x15;
+    const BSP_RUN_STATE    = 0x20;
+    const BSP_RUN_CLOSE    = 0x21;
 
     // BSP status codes
     const BSP_STATUS_SUCCESS=0x00;
@@ -167,6 +394,23 @@
     const BSP_STATUS_INVALID=0x02;
     const BSP_STATUS_NOT_FOUND=0x03;
     const BSP_STATUS_TRY_AGAIN=0x04;
+
+    // Character -> shorthand class.
+    const CLS_TXT = [ 'Z', 'S', 'N', 'P', 'B', 'D', 'A' ];
+
+    // Run types
+    const RUN_TYPE_TXT =
+    [
+        "?",
+        "Baal",
+        "Chaos",
+        "Chaos + Baal",
+        "Chant",
+        "Cow",
+        "Tomb",
+        "Trist",
+        "Misc",
+    ];
 
     // Game type flags
     const GT_NM_BIT   = 0;
@@ -178,6 +422,9 @@
     const GT_FLAG_HARDCORE  = (1<<GT_CORE_BIT);
     const GT_FLAG_LADDER    = (1<<GT_LAD_BIT);
     const GT_REALM_MASK     = 0x60;
+
+    // Game flags
+    const GAME_FLAG_RUN = (1<<0);
 
     // States
     const STATE_DISCONNECTED = 0;
@@ -191,20 +438,58 @@
     const FETCH_TIMEOUT = 4000;
 
     // debugging
-    const dbgout = 1;
+    var dbgout = 0;
 
     // Globals
     var ws;
     var State;
     var ActiveMode = ACTIVE_MODE_INVALID;
     var LocalMode;
+    var Games;
+    var esGames;
+    var eleGamesRoot = GetElement("gtbl");
+    var Runs;
+    var esRuns;
+    var eleRunsRoot = GetElement("rtbl");
+    var Characters;
+    var RQ_head;
+    var RQ_tail;
+    var RQ_len;
+    var ResolvePending;
+    var GameSortProp = "ts_created";
+    var GameSortInv = false;
+    var bHideRuns = false;
 
     var host=location.hostname? location.hostname:"localhost";
 
     dbg("host: "+host);
 
 
+    Init("Home");
+
     WsConnect();
+    setInterval(FlushResolveQueue, 1000);
+
+
+
+    function Init(default_section)
+    {
+        for(var sections = document.getElementsByClassName("section"), i = 0, navmain = GetElement("navmain"); i < sections.length; i++)
+        {
+            navmain.appendChild(CreateElement("span", null, "nav navlabel", sections[i].id)).setAttribute("onclick", "SwitchSection('"+sections[i].id+"')");
+        }
+
+        SwitchSection(default_section);
+    }
+
+
+    function SwitchSection(section)
+    {
+        for(var sections = document.getElementsByClassName("section"), i = 0; i < sections.length; i++)
+        {
+            sections[i].style.display = sections[i].id == section ? "block" : "none";
+        }
+    }
 
     function UpdateInputState()
     {
@@ -223,7 +508,18 @@
 
     function SetActiveMode(mode)
     {
-        GetElement("gtbl").innerHTML="";
+        while(eleGamesRoot.firstChild)
+            eleGamesRoot.firstChild.remove();
+
+        esGames = es_create(eleGamesRoot);
+        Games = new Array();
+
+        while(eleRunsRoot.firstChild)
+            eleRunsRoot.firstChild.remove();
+
+        esRuns = es_create(eleRunsRoot);
+        Runs = new Array();
+
         ActiveMode = mode;
         UpdateInputState();
     }
@@ -250,6 +546,52 @@
         return mode;
     }
 
+
+    function SubmitFeedback()
+    {
+        var text;
+        var status;
+
+        if(!(text = GetElement("feedback_text").value).length)
+            return;
+
+        if(ActiveMode == ACTIVE_MODE_INVALID)
+            status = "Unable to submit feedback. Not connected."
+
+        else
+        {
+            status = "Feedback submitted succesfully.";
+            GetElement("feedback_btn").disabled = true;
+            GetElement("feedback_text").value = "";
+
+            BSP_Feedback(text);
+        }
+
+        GetElement("feedback_status").innerText = status;
+    }
+
+    function SetGameSort(prop)
+    {
+        GameSortInv ^= (prop == GameSortProp);
+        GameSortProp = prop;
+
+        SortGames();
+    }
+
+    function SortGames()
+    {
+        es_update(esGames, GameSortProp, function(a,b){ return b-a; }, GameSortInv, TestLocalFilterGame);
+    }
+
+    function SortRuns()
+    {
+        es_update(esRuns, "run_type", function(a,b) { return a-b }, false, null);
+    }
+
+    function TestLocalFilterGame(game)
+    {
+        return !(bHideRuns && (game.flags & GAME_FLAG_RUN));
+    }
 
     function EnableModeInput(enabled)
     {
@@ -283,105 +625,348 @@
 
         ws.send(FetchMsg);
     }
-    
+   
 
-    function CheckGameExists(game_id)
+    function LookupGame(game_id)
     {
-        var ele;
+        if(Games[game_id])
+            return Games[game_id];
 
-        if(!GetElement(game_id))
-        {
-            var row=CreateElement("tr",game_id);
+        dbg("Create game: " + game_id);
 
-            var ele_td = CreateElement("td");
-            var ele_name = CreateElement("span", game_id+"_"+"name");
-            var ele_desc = CreateElement("div",game_id+"_"+"desc");
+        let game = new Object();
+        Games[game_id] = game;
+        es_add(esGames, game);
 
-            ele_desc.className = "gdesc";
+        game.id = game_id;
+        game.name = null;
+        game.desc = null;
+        game.flags = null;
+        game.max_players = null;
+        game.cur_players = null;
+        game.clvl_diff = null;
+        game.ts_created = 0x7FFFFFFF;
+        game.players = new Array();
+        game.td = new Object();
 
-            ele_td.appendChild(ele_name);
-            ele_td.appendChild(ele_desc);          
- 
-            row.appendChild(ele_td);
-            row.appendChild(CreateElement("td",game_id+"_"+"uptime"));
-            row.appendChild(CreateElement("td",game_id+"_"+"pcount"));
+        game.__node = CreateElement("tr");
+        game.td["name"] = game.__node.appendChild(CreateElement("td"));
+        game.td["name"].appendChild(CreateElementEx("span", game, "game", "name"));
+        game.td["name"].appendChild(CreateElementEx("div", game, "game", "desc"));
+        game.td["created"] = game.__node.appendChild(CreateElementEx("td", game, "game", "ts_created", FH_Timestamp));
+        game.td["host"] = game.__node.appendChild(CreateElement("td"));
+        game.td["players"] = game.__node.appendChild(CreateElement("td"));
 
-            GetElement("gtbl").appendChild(row);
-         
-        }
+        eleGamesRoot.appendChild(game.__node);
+
+        return game;
     }
 
-    function SetGameProp(game_id,prop,value)
+
+    function LookupCharacter(char_id)
     {
-        GetElement(game_id+"_"+prop).innerText=value;
+        if(Characters[char_id])
+            return Characters[char_id];
+
+        let character = new Object();
+        Characters[char_id] = character;
+        character.id = char_id;
+        character.cls = null;
+        character.clvl = null;
+        character.name = null;
+
+        BSP_Resolve(character);
+
+        return character;
     }
 
 
-    function BSP_ProcessGameDesc(game_id,dv)
+    function LookupRun(run_id)
+    {
+        if(Runs[run_id])
+            return Runs[run_id];
+
+        var tmp;
+        var run = new Object();
+        Runs[run_id] = run;
+        es_add(esRuns, run);
+
+        run.id = run_id;
+        run.run_type = null;
+        run.duration_avg = null;
+        run.duration_stddev= null;
+        run.pop_avg = null;
+        run.cur_game = null;
+        run.td = new Object();
+
+        run.__node = CreateElement("tr");
+        run.td["type"] = run.__node.appendChild(CreateElementEx("td", run, "run", "run_type", FM_Runtype));
+        run.td["game"] = run.__node.appendChild(CreateElementEx("td", null, "game", "name", null));
+        run.td["started"] = run.__node.appendChild(CreateElementEx("td", null, "game", "ts_created", FH_Timestamp));
+        tmp = run.__node.appendChild(CreateElement("td"));
+        run.td["cur_players"] = tmp.appendChild(CreateElementEx("span", null, "game", "cur_players", null));
+        run.td["max_players"] = tmp.appendChild(CreateElementEx("span", null, "game", "max_players", FH_Maxplayers));
+        tmp = run.__node.appendChild(CreateElement("td"));
+        run.td["duration_avg"] = tmp.appendChild(CreateElementEx("span", run, "run", "duration_avg", FH_Period));
+        run.td["duration_stddev"] = tmp.appendChild(CreateElementEx("span", run, "run", "duration_stddev", FH_Stddev));
+        run.td["pop_avg"] = run.__node.appendChild(CreateElementEx("td", run, "run", "pop_avg", null));
+
+        eleRunsRoot.appendChild(run.__node);
+
+        return run;
+    }
+
+    function RemoveGame(game)
+    {
+        es_rem(esGames, game);
+        game.__node.remove();
+        Games[game.id] = null;
+    }
+
+
+    function RemoveRun(run)
+    {
+        es_rem(esRuns, run);
+        run.__node.remove();
+        Runs[run.id] = null;
+    }
+
+    function SetGameProp(game,prop,value)
+    {
+        SetObjProp(game, "game", prop, value);
+    }
+
+    function SetCharProp(rchar, prop, value)
+    {
+        SetObjProp(rchar, "character", prop, value);
+    }
+
+    function SetRunProp(rrun, prop, value)
+    {
+        SetObjProp(rrun, "run", prop, value);
+    }
+
+    function GameAddPlayer(game, player)
+    {
+        game.players[player.pid] = player;
+
+        player.__node = CreateElement("span", null, "pinf");
+        player.__node.appendChild(CreateElementEx("span", player.rchar, "character", "cls", FH_Charcls));
+        player.__node.appendChild(CreateElementEx("span", player.rchar, "character", "clvl"));
+        player.__node.appendChild(CreateElementEx("span", player.rchar, "character", "name"));
+       
+        game.td["players"].appendChild(player.__node);
+
+        if(player.is_host)
+            game.td["host"].appendChild(CreateElementEx("span", player.rchar, "character", "name"));
+
+        SetGameProp(game, "cur_players", ++game.cur_players);
+    }
+
+
+    function GameRemPlayer(game, pid)
+    {
+        game.players[pid].__node.remove();
+        game.players[pid].__node = null;
+        game.players[pid] = null;
+
+        SetGameProp(game, "cur_players", --game.cur_players);
+    }
+
+
+    function BSP_ProcessGameDesc(game,dv)
     {
         var off=0;
         var tmp;
-        var game_name=read_str(dv,off+1,(tmp=read_uib(dv,off))); off+=1+tmp;
-        var game_desc=read_str(dv,off+1,(tmp=read_uib(dv,off))); off+=1+tmp;
-
+        game.flags = read_uib(dv, off); off += 1;
+        game.name = read_str(dv,off+1,(tmp=read_uib(dv,off))); off+=1+tmp;
+        game.desc = read_str(dv,off+1,(tmp=read_uib(dv,off))); off+=1+tmp;
 
         dbg("game_desc: ");
-        dbg("  game_name: "+game_name);
-        dbg("  game_desc: "+game_desc);
+        dbg("  flags:     "+game.flags)
+        dbg("  game_name: "+game.name);
+        dbg("  game_desc: "+game.desc);
 
-        SetGameProp(game_id,"name", game_name);
-        SetGameProp(game_id, "desc", game_desc);
+
+        SetGameProp(game, "name", game.name);
+        SetGameProp(game, "desc", game.desc);
+
         return off;
     }
 
-    function BSP_ProcessGameDescEx(game_id,dv)
+    function BSP_ProcessGameDescEx(game,dv)
     {
         var off=0;
-        var max_players=read_uib(dv,off); off+=1;
-        var cur_players=read_uib(dv,off); off+=1;
-        var clvl_diff=read_uib(dv,off); off+=1;
-        var dt_uptime=new Date(Date.now()-(read_uib(dv,off)*1000)); off+=1;
+        var tmp = 0;
+        game.max_players = read_uib(dv,off); off+=1;
+        game.clvl_diff = read_uib(dv,off); off+=1;
+        game.ts_created = Date.now() - ((tmp=read_uiw(dv,off))*1000); off+=2;
+
+
+        dbg("[TIME OFFSET]: " + tmp);
+
+        //var dt_uptime=new Date(Date.now()-(read_uib(dv,off)*1000)); off+=1;
 
         dbg("game_desc_ex: ");
-        dbg("  max_players: " +max_players);
-        dbg("  cur_players: " +cur_players);
-        dbg("  clvl_diff:   " +clvl_diff);
-        dbg("  dt_uptime:   " +dt_uptime);
+        dbg("  max_players: " +game.max_players);
+        dbg("  clvl_diff:   " +game.clvl_diff);
+        dbg("  ts_created:  " +game.ts_created);
 
-        SetGameProp(game_id,"pcount", cur_players + "/" + max_players);
-        SetGameProp(game_id,"uptime", FmtTime(dt_uptime));
+        SetGameProp(game,"ts_created", game.ts_created);
+        SetGameProp(game, "max_players", game.max_players);
+        SetGameProp(game, "clvl_diff", game.clvl_diff);
 
         return off;
     }
 
-//    struct bsp_char_desc
-//{
-//    uid char_id;
-//    uib clvl;
-//    uib cls;
-//    uib dt_join;
-//    uib name_len;
-//    char name[]; /* Pascal string */
-//};
+    function BSP_ProcessPlayerDesc(game, dv)
+    {
+        var off = 0;
+        var player = new Object();
+        player.pid = read_uib(dv, off); off += 1;
+        player.char_id = read_uid(dv, off); off += 4;
+        player.dt_join = Date.now() - (read_uiw(dv, off)*1000); off += 2;
+        player.is_host = (player.char_id & 0x80000000);
+        player.char_id = player.char_id & 0x7FFFFFFF;
+        player.rchar = LookupCharacter(player.char_id);
 
-    function BSP_ProcessCharDesc(game_id, dv)
+        dbg("["+game.name+"] Player desc: ");
+        dbg("  pid: " + player.pid);
+        dbg("  char_id: " + player.char_id);
+        dbg("  is_host: " + player.is_host);
+        dbg("  dt_join: " + FmtTime(new Date(player.dt_join)));
+
+        GameAddPlayer(game, player);
+
+        return off;
+    }
+
+    function BSP_ProcessCharDesc(char, dv)
     {
         var off = 0;
         var tmp;
-        var char_id = read_uid(dv,off); off+=4;
-        var clvl = read_uib(dv, off); off+=1;
-        var cls = read_uib(dv, off); off+=1;
-        var dt_join = new Date(Date.now()-(read_uib(dv,off)*1000)); off+=1;
-        var name = read_str(dv,off+1,(tmp=read_uib(dv,off))); off+=1+tmp;
+        var clvl = read_uib(dv, off); off += 1;
+        var cls = read_uib(dv, off); off += 1;
+        var name = read_str(dv, off+1, (tmp = read_uib(dv, off))); off += 1+tmp;
 
-        dbg("char desc:");
-        dbg("  name:    " + name);
-        dbg("  char_id: " + char_id);
-        dbg("  clvl:    " + clvl);
-        dbg("  cls:     " + cls);
-        dbg("  dt_join: " + FmtTime(dt_join));
+        dbg("Resolved character ("+char.id+")");
+        dbg("  name: " + name);
+        dbg("  cls:  " + cls);
+        dbg("  clvl: " + clvl);
+
+        SetCharProp(char, "name", name);
+        SetCharProp(char, "cls", cls);
+        SetCharProp(char, "clvl", clvl);
 
         return off;
+    }
+
+
+    function BSP_ProcessRunDesc(run, dv)
+    {
+        var off = 0;
+        var cur_game_id = read_uiw(dv, off); off += 2;
+        var duration_avg = read_uiw(dv, off); off += 2;
+        var run_type = read_uib(dv, off); off += 1;
+        var duration_stddev = read_uib(dv, off); off += 1;
+        var pop_avg = read_uib(dv, off); off += 1;
+        var rating = read_uib(dv, off); off += 1;
+        var cur_game = LookupGame(cur_game_id);
+
+        dbg("Run desc ("+run.id+")");
+        dbg("  cur_game_id:     " + cur_game_id);
+        dbg("  cur_game:        " + cur_game.name);
+        dbg("  duration_avg:    " + duration_avg);
+        dbg("  run_type:        " + run_type);
+        dbg("  duration_stddev: " + duration_stddev);
+        dbg("  pop_avg:         " + pop_avg);
+        dbg("  rating:          " + rating);
+
+        LinkEle(run.td["game"], cur_game);
+        LinkEle(run.td["started"], cur_game);
+        LinkEle(run.td["cur_players"], cur_game);
+        LinkEle(run.td["max_players"], cur_game);
+
+        SetRunProp(run, "run_type", run_type);
+
+        if(duration_avg)
+        {
+            SetRunProp(run, "duration_avg", duration_avg);
+            SetRunProp(run, "duration_stddev", duration_stddev);
+        }
+            
+        if(pop_avg)
+            SetRunProp(run, "pop_avg", pop_avg);
+
+        return off;
+    }
+
+    function FlushResolveQueue()
+    {
+        if(!RQ_len || ResolvePending)
+            return;
+
+        let count = Math.min(RQ_len, 128);
+        let msg = new Uint8Array(1 + (count * 4));
+        msg[0] = BSP_RESOLVE_CHAR;
+        let dv = new DataView(msg.buffer, 1);
+
+        dbg("Flush resolve queue: " + count + "(" + RQ_len + ")");
+        
+        for(let i = 0, rchar = RQ_tail; i < count; i++, rchar = rchar.__rq_next)
+            write_uid(dv, i*4, rchar.id);
+
+        ws.send(msg);
+        ResolvePending = true;
+    }
+
+    function BSP_Resolve(rchar)
+    {
+        RQ_Add(rchar);
+    }
+
+    function BSP_Feedback(feedback_text)
+    {
+        let msg = new Uint8Array(2 + (feedback_text.length*2));
+        msg[1] = BSP_FEEDBACK; 
+        let str = new Uint16Array(msg.buffer, 2);
+
+        for(let i = 0; i < feedback_text.length; i++)
+            str[i] = feedback_text.charCodeAt(i);
+
+        ws.send(new Uint8Array(msg.buffer, 1, msg.byteLength-1));
+    }
+
+    function RQ_Add(rchar)
+    {
+        if(rchar.__resolving)
+            return;
+
+        rchar.__rq_next = null;
+        rchar.__resolving = true;
+
+        if(RQ_head)
+            RQ_head.__rq_next = rchar;
+
+        else
+            RQ_tail = rchar;
+        
+        RQ_head = rchar;
+        return ++RQ_len;
+    }
+
+    function RQ_Rem()
+    {
+        let r = RQ_tail;
+
+        if(!r)
+            return null;
+
+        if(!(RQ_tail = r.__rq_next))
+            RQ_head = null;
+
+        RQ_len--;
+        return r;
     }
 
 
@@ -403,6 +988,12 @@
         dbg("BSP connected");
         SetActiveMode(ACTIVE_MODE_UNDEFINED);
         SetStatusMsg("");
+
+        Characters = new Array();
+        RQ_head = null;
+        RQ_tail = null;
+        RQ_len = 0;
+        ResolvePending = false;
     }
 
     function WsOnClose(evt)
@@ -422,98 +1013,122 @@
         {
             var mid=read_uib(dv,off); off+=1;
 
-            dbg("Received message: "+mid);
+            dbg("Received message: "+mid+" ("+dv.byteLength+")");
 
-
-            if(mid==BSP_FETCH_LIST)
+            if(mid >= 0x20)
             {
-                var status=read_uib(dv,off); off+=1;
-                var type=read_uib(dv,off); off+=1;
-
-                dbg("Got BSP_FETCH_LIST. Status:"+status+" Type:"+type);
-
-                if(status != BSP_STATUS_NOT_FOUND)
-                {
-                    SetActiveMode(type);
-
-                    if(status == BSP_STATUS_TRY_AGAIN)
-                        SetStatusMsg("Data for this mode will appear when it becomes available.");
-
-                    else
-                        SetStatusMsg("");
-                }
-
-                else
-                {
-                    SetActiveMode(ACTIVE_MODE_UNDEFINED);
-                    SetStatusMsg("The selected mode is currently not supported.")
-                }
+                dbg("lookup run");
+                var ctx_run = LookupRun(read_uiw(dv, off)); off += 2;
             }
 
-            else if(ActiveMode < ACTIVE_MODE_UNDEFINED)
+            else if(mid >= 0x10)
             {
+                var ctx_game = LookupGame(read_uiw(dv,off)); off += 2;
+            }
 
-                if(mid==BSP_GAME_STATE)
+            switch(mid)
+            {
+                case BSP_FETCH_LIST:
                 {
-                    var game_id=read_uiw(dv,off); off+=2;
+                    var status=read_uib(dv,off); off+=1;
+                    var type=read_uib(dv,off); off+=1;
 
-                    CheckGameExists(game_id);
-                    off+=BSP_ProcessGameDescEx(game_id,new DataView(evt.data,off));
-                    off+=BSP_ProcessGameDesc(game_id,new DataView(evt.data,off));
+                    dbg("Got BSP_FETCH_LIST. Status:"+status+" Type:"+type);
+
+                    if(status != BSP_STATUS_NOT_FOUND)
+                    {
+                        SetActiveMode(type);
+
+                        if(status == BSP_STATUS_TRY_AGAIN)
+                            SetStatusMsg("Data for this mode will appear when it becomes available.");
+
+                        else
+                            SetStatusMsg("");
+                    }
+
+                    else
+                    {
+                        SetActiveMode(ACTIVE_MODE_UNDEFINED);
+                        SetStatusMsg("The selected mode is currently not supported.")
+                    }
+                }
+                break;
+
+                case BSP_GAME_STATE:
+                {
+                    off+=BSP_ProcessGameDescEx(ctx_game,new DataView(evt.data,off));
+                    off+=BSP_ProcessGameDesc(ctx_game,new DataView(evt.data,off));
 
                     var char_count = read_uib(dv, off); off += 1;
 
                     dbg("char_count: " + char_count);
 
                     while(char_count--)
-                        off += BSP_ProcessCharDesc(game_id, new DataView(evt.data, off));
+                        off += BSP_ProcessPlayerDesc(ctx_game, new DataView(evt.data, off));
                 }
+                break;
 
-                else if(mid==BSP_GAME_OPEN)
+                case BSP_GAME_OPEN:
                 {
-                    var game_id=read_uiw(dv,off); off+=2;
-
-                    CheckGameExists(game_id);
-                    off+=BSP_ProcessGameDesc(game_id,new DataView(evt.data,off));
+                    off+=BSP_ProcessGameDesc(ctx_game,new DataView(evt.data,off));
                 }
+                break;
 
-                else if(mid==BSP_GAME_UPDATE)
+                case BSP_GAME_UPDATE:
                 {
-                    var game_id=read_uiw(dv,off); off+=2;
-
-                    CheckGameExists(game_id);
-                    off+=BSP_ProcessGameDescEx(game_id,new DataView(evt.data,off));
+                    off+=BSP_ProcessGameDescEx(ctx_game,new DataView(evt.data,off));
                 }
+                break;
 
-                else if(mid==BSP_GAME_CLOSE)
+                case BSP_GAME_CLOSE:
                 {
-                    var game_id=read_uiw(dv,off); off+=2;
-
-                    dbg("game close: "+game_id);
-                    GetElement(game_id).remove();
+                    RemoveGame(ctx_game);
                 }
+                break;
 
-                else if(mid == BSP_GAME_PADD)
+                case BSP_GAME_PADD:
                 {
-                    var game_id=read_uiw(dv,off); off+=2;
-
-                    off += BSP_ProcessCharDesc(game_id, new DataView(evt.data, off));
+                    off += BSP_ProcessPlayerDesc(ctx_game, new DataView(evt.data, off));
                 }
+                break;
 
-                else if(mid == BSP_GAME_PREM)
+                case BSP_GAME_PREM:
                 {
-                    var game_id=read_uiw(dv,off); off+=2;
-                    var char_id=read_uid(dv,off); off+=4;
+                    var pid=read_uib(dv,off); off+=1;
 
-                    dbg("["+game_id+"] Player leave: " + char_id);
+                    dbg("["+ctx_game.name+"] Player leave: " + pid);
 
+                    GameRemPlayer(ctx_game, pid);
                 }
+                break;
 
-                else
+                case BSP_RESOLVE_CHAR:
+                {
+                    while(off < dv.byteLength)
+                        off += BSP_ProcessCharDesc(RQ_Rem(), new DataView(evt.data, off));
+
+                    ResolvePending = false;
+                }
+                break;
+
+                case BSP_RUN_STATE:
+                    off += BSP_ProcessRunDesc(ctx_run, new DataView(evt.data, off));
+                break;
+
+                case BSP_RUN_CLOSE:
+                    RemoveRun(ctx_run);
+                break;
+
+                default:
                     dbg("Received unknown BSP message: "+mid);
+            
            }
         }
+
+        SortGames();
+        SortRuns();
     }
+
 
 
     // Helpers/wrappers
@@ -521,6 +1136,7 @@
     function read_uiw(dv,off) { return dv.getUint16(off,true); }
     function read_uid(dv,off) { return dv.getUint32(off,true); }
     function read_str(dv,off,len) { return String.fromCharCode.apply(null,new Uint8Array(dv.buffer,dv.byteOffset+off,len)); }
+    function write_uid(dv, off, val) { dv.setUint32(off, val, true); }
 
     function SetStatusMsg(str) { GetElement("status").innerText = str; }
 
@@ -529,12 +1145,87 @@
         return ((dt.getHours() + 11) % 12 + 1) + ":" + ('0' + dt.getMinutes()).slice(-2) + (dt.getHours() >= 12 ? "pm" : "am");
     }
 
-    function CreateElement(tag,id)
+    function FH_Timestamp(ts)
     {
-        var ele=document.createElement(tag);
-        ele.id=id;
-        return ele;
+        return FmtTime(new Date(ts));
     }
+
+    function FH_Charcls(cls)
+    {
+        return CLS_TXT[cls];
+    }
+
+    function FH_Period(seconds)
+    {
+        let m = Math.floor(seconds / 60);
+        let s = Math.floor(seconds % 60);
+
+        return m+":"+(s>9?s:"0"+s);
+    }
+
+    function FH_Stddev(stddev)
+    {
+        return "σ " + stddev;
+    }
+
+    function FM_Runtype(type)
+    {
+        return RUN_TYPE_TXT[type];
+    }
+
+    function FH_Maxplayers(max_players)
+    {
+        return max_players == 8 ? "" : "/" + max_players;
+    }
+
+    function CreateElementEx(tag, robj, objtype, objprop, fmt_handler)
+    {
+        let e = document.createElement(tag);
+        e.className = objtype+"_"+objprop;
+        e.__fmt_handler = fmt_handler;
+        e.__lnkprop = objprop;
+
+        LinkEle(e, robj, objprop); 
+
+        return e;
+    }
+
+    function LinkEle(ele, robj)
+    {
+        ele.__lnkobj = robj;
+        SyncObjProp(ele, ele.__lnkobj, ele.__lnkprop);
+    }
+
+    function CreateElement(tag, id, class_name, text)
+    {
+        let e = document.createElement(tag);
+        
+        if(id) e.id = id;
+        if(class_name) e.className = class_name;
+        if(text) e.innerText = text;
+
+        return e;
+    }
+
+    function SyncObjProp(ele, robj, prop)
+    {
+        if(robj == null || robj[prop] == null)
+            return;
+
+        ele.innerText = ele.__fmt_handler ? ele.__fmt_handler(robj[prop]) : robj[prop];
+    }
+
+    function SetObjProp(robj, objtype, objprop, val)
+    {
+        robj[objprop] = val;
+
+        for(let e = document.getElementsByClassName(objtype+"_"+objprop), i = 0; e && i < e.length; i++)
+        {
+            if(e[i].__lnkobj == robj)
+                SyncObjProp(e[i], robj, objprop);
+        }
+    }
+
 
     function GetElement(id) { return document.getElementById(id); }
 
@@ -542,6 +1233,59 @@
     {
         if(dbgout)
             console.log(str)
+    }
+
+    function es_create(root_node)
+    {
+        var es = new Object();
+
+        es.list = new Array();
+        es.root_node = root_node;
+
+        return es;
+    }
+
+    function es_add(es, obj)
+    {
+        es.list.push(obj);
+    }
+
+    function es_rem(es, obj)
+    {
+        for(let i = 0; i < es.list.length; i++)
+        {
+            if(es.list[i] == obj)
+            {
+                es.list.splice(i, 1);
+                break;
+            }
+        }
+    }
+
+    function es_update(es, field, pfcmp, sortinv, pfdsptest)
+    {
+        es.list.sort(function(a, b)
+        {
+            let r = pfcmp(a[field], b[field]);
+
+            return sortinv ? -r : r;
+        });
+
+        nodes = es.root_node.childNodes;
+
+        for(var i = 0, x = 0; i < es.list.length; x++)
+        {
+            if(nodes[x].nodeType != Node.ELEMENT_NODE)
+                continue;
+
+            if(nodes[x] != es.list[i].__node)
+                es.root_node.insertBefore(es.list[i].__node, nodes[x]);
+
+            if(pfdsptest)
+                es.list[i].__node.style.display = pfdsptest(es.list[i]) ? "" : "none";
+
+            i++;
+        }
     }
 
 </script>

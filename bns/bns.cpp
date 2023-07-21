@@ -19,12 +19,12 @@ struct Game;
 // Globals
 static uid st_systime_cache; // Cached UNIX timestamp of current time.
 static uid ts_tick_cache; // Cached current tick.
-
+static uid client_count;
 
 static Chat east;
 static Chat west;
 static Chat euro;
-static BnClient bnc[32];
+static BnClient bnc[64];
 
 
 
@@ -32,7 +32,7 @@ void SystemHealthCheck()
 {
     uid ts = GetTickCount();
 
-    for(uid i = 0; i < cfg_accounts_sz; i++)
+    for(uid i = 0; i < client_count; i++)
     {
         if(bnc[i].State != BNC_STATE_MCP_LOGGED)
             LDBG("!!! Client not online: %s (%s)", bnc[i].pAccount->name, bnc[i].pKey->d2dv);
@@ -114,9 +114,12 @@ uib Startup()
 }
 
 
+extern uib ParseRunName(const char* pName, char* pRunName, char* pFormat, uid* pSequence);
 
-
-
+#define _SECOND ((uiq) 10000000)
+#define _MINUTE (60 * _SECOND)
+#define _HOUR   (60 * _MINUTE)
+#define _DAY    (24 * _HOUR)
 
 uib AppEntry()
 {
@@ -127,11 +130,12 @@ uib AppEntry()
         return FALSE;
 
 
-    for(uid i = 0; i < cfg_accounts_sz && i < cfg_keys_sz; i++)
-    {
-        bnc[i].Initialize(&cfg_accounts[i], &cfg_keys[i]);
-        bnc[i].Connect();
-    }
+    //for(uid i = 0; i < cfg_accounts_sz && i < cfg_keys_sz; i++)
+    //{
+    //    bnc[i].Initialize(&cfg_accounts[i], &cfg_keys[i]);
+    //    bnc[i].Connect();
+    //    client_count++;
+    //}
 
 
     chat_cfg chat_east =
@@ -154,10 +158,11 @@ uib AppEntry()
     //west.Initialize(&chat_west);
     //euro.Initialize(&chat_euro);
 
-   // east.Connect();
+    //east.Connect();
     //west.Connect();
     //euro.Connect();
    
+    uid Uptime = GetTimeUTC();
 
     for(;;)
     {

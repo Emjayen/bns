@@ -20,7 +20,7 @@
 struct host
 {
     uib conns; /* Current number of websocket connections */
-    uib bkt_tokens; /* Current number of tokens */
+    uid bkt_tokens; /* Current number of tokens */
     uid ts_last_add; /* Last time tokens were added */
 };
 

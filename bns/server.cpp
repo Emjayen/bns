@@ -13,14 +13,24 @@
 
 // Prototypes
 Character* FindCharacter(uib Mode, const char* pstrName, uib bCreateIfNotExist);
+Run* LookupRun(const char* pRunName, uid Type);
+uib GetRunType(const char* pName);
+uib ParseRunName(const char* pName, char* pRunName, char* pFormat, uid* pSequence);
+uid GetRunTypeMaxDuration(uib RunType);
+
+// Constants
+#define CFG_JOIN_ACCURACY_THRESH 18000
 
 // Pools
 Game* plGames; // Game object pool.
+Run* plRuns; // Runs pool.
 freelist flGames; // 'plGames' freelist.
+freelist flRuns; // 'plRuns' freelist.
 
 // Globals
 Game* IdIdxTbl[GT_TOTAL_REALMS][CFG_MAX_GAME_ID_MASK+1]; // Translate game_id to Game; hint only.
 list lstGameType[GT_TYPE_IDX_MASK+1]; // Game::ln_type. All games sorted by base game type (low bits).
+list lstRunType[GT_TYPE_IDX_MASK+1]; // Run::ln_type. All runs sorted by game type.
 list lstGameRealm[GT_TOTAL_REALMS]; // Game::ln_realm. All games sorted by realm.
 list lstListeners[GT_TYPE_IDX_MASK+1]; // Session::ln_listen. Sessions sorted by game type they are listening for.
 uib GameModeStatus[GT_TYPE_IDX_MASK+1]; // For each mode: 0=We dont have a client at all for it; 1=We have a client for it; 1..n; we have n-1 clients currently available.
@@ -46,6 +56,7 @@ struct
 // Helpers
 #define GetGameID(_pGame) ((uiw) (_pGame - plGames))
 #define GetCharID(_pChar) ((uid) (_pChar - Characters.p))
+#define GetRunID(_pRun) ((uiw) (_pRun - plRuns))
 
 struct EMQ
 {
@@ -74,10 +85,17 @@ uib Session::OnFetchList(bspc_fetch_list* pMsg, uid Length)
         byte* pd;
         bsps_game_state* pStateMsg;
         bsps_fetch_list* pFetchMsg;
+        bsps_run_state* pRunMsg;
     };
 
     pd = tmp+BSP_FRAME_HDR_SZ;
 
+
+    if(!ChargeHost(this->pHost, CFG_BSP_TKNBKT_FETCH_COST))
+    {
+        LWARN("[ABUSE] Exceeded rate-limit (resolve)");
+        return FALSE;
+    }
 
     // Mask off mode just in case.
     uib Type = (pMsg->type & GT_MODE_MASK);
@@ -119,13 +137,86 @@ uib Session::OnFetchList(bspc_fetch_list* pMsg, uid Length)
             pStateMsg->game_id = GetGameID(ple);
             ple->EncExtended(&pStateMsg->desc_ex);
             pd += sizeof(bsps_game_state) + ple->EncBasic((bsp_game_desc*) pStateMsg->etc);
-            pd += ple->EncCharlist((bsp_char_desc*) pd);
+            pd += ple->EncPlayerList((bsp_pdesc*) pd);
+        }
+
+        // Send full run-state data for the selected mode.
+        LIST_ITERATE(lstRunType[Type], Run, ln_type)
+        {
+            if(ple->flags & RUN_FLAG_VALID)
+            {
+                pRunMsg->mid = BSP_RUN_STATE;
+                pRunMsg->run_id = GetRunID(ple);
+                pd += sizeof(bsps_run_state) + ple->Enc((bsp_run_desc*) pRunMsg->ect);
+            }
         }
     }
 
     if((pd-tmp) > BSP_FRAME_HDR_SZ)
         Send(tmp+BSP_FRAME_HDR_SZ, (pd-tmp)-BSP_FRAME_HDR_SZ);
 
+    return TRUE;
+}
+
+
+/*
+ * Session::OnResolveChar
+ *
+ */
+uib Session::OnResolveChar(bspc_resolve_char* pMsg, uid Length)
+{
+    static byte tmp[sizeof(bsps_resolve_char) + (32 * CFG_BSP_MAX_RESOLVE_COUNT)];
+
+    union
+    {
+        bsps_resolve_char* pResultMsg;
+        byte* p;
+    };
+
+    p = tmp+BSP_FRAME_HDR_SZ;
+
+    uid count = (Length - sizeof(bspc_resolve_char)) / sizeof(uid); /* char_id */
+
+    LDBG("Received resolve request; %u count", count);
+
+    count = __min(count, CFG_BSP_MAX_RESOLVE_COUNT);
+
+    if(!ChargeHost(this->pHost, CFG_BSP_TKNBKT_RESOLVE_BASE_COST + (CFG_BSP_TKNBKT_RESOLVE_N_COST * count)))
+    {
+        LWARN("[ABUSE] Exceeded rate-limit (resolve)");
+        return FALSE;
+    }
+
+    pResultMsg->mid = BSP_RESOLVE_CHAR;
+    p += sizeof(bsps_resolve_char);
+
+    for(uid i = 0; i < count; i++)
+    {
+        if(pMsg->char_id[i] >= Characters.count)
+        {
+            LWARN("[ABUSE] Received request for invalid character: %u", pMsg->char_id[i]);
+            return FALSE;
+        }
+
+        p += Characters.p[pMsg->char_id[i]].Enc((bsp_char_desc*) p);
+    }
+
+    Send(tmp+BSP_FRAME_HDR_SZ, (p-tmp)-BSP_FRAME_HDR_SZ);
+
+    return TRUE;
+}
+
+
+/*
+ * Session::OnFeedback
+ *
+ */
+uib Session::OnFeedback(bspc_feedback* pMsg, uid Length)
+{
+    LOG("Received feedback (host:%a bytes:%u)", this->Addr, Length);
+
+    DumpFile(pMsg->text, Length-sizeof(bspc_feedback), "feedback\\%a-%u.txt", this->Addr, GetTickCount());
+    
     return TRUE;
 }
 
@@ -191,6 +282,59 @@ void FlushEventMessages(void*)
 
 
 /*
+ * TcbRunExpire
+ *
+ */
+void TcbRunExpire(Run* pRun)
+{
+    LOG("(%s) Expiring run", pRun->Name);
+
+    pRun->Destroy();
+}
+
+
+/*
+ * CreateRun
+ *
+ */
+Run* CreateRun(const char* pRunName, uid Mode, uib RunType)
+{
+    Run* p;
+
+
+    ASSERT(strlen(pRunName) < sizeof(Run::Name));
+
+    if(!(p = (Run*) freelist_alloc(&flRuns)))
+    {
+        LERR("Failed to allocate run");
+        return NULL;
+    }
+
+    memzero(p, sizeof(Run));
+
+    if(!(p->htExpire = timer_create((PFTIMERCALLBACK) &TcbRunExpire, p)))
+    {
+        LERR("Failed to create run expire timer");
+        freelist_free(&flRuns, p);
+        return NULL;
+    }
+
+    p->mode = ((uib) Mode) & GT_MODE_MASK;
+    p->run_type = RunType;
+    p->name_len = strlen(pRunName);
+    memcpy(p->Name, pRunName, p->name_len);
+
+    timer_set(p->htExpire, GetTickCount()+GetRunTypeMaxDuration(p->run_type), NULL);
+
+    list_append(&lstRunType[p->mode], &p->ln_type);
+
+    LOG("Run created: %s (0x%X) run type: %u", p->Name, p->mode, p->run_type);
+
+    return p;
+}
+
+
+/*
  * CreateGame
  *
  */
@@ -217,6 +361,7 @@ Game* CreateGame(const char* pName, uid Type)
 
     LOG("Game created: %s (0x%X)", p->name, p->type);
 
+    p->AddRef();
 
     return p;
 }
@@ -228,7 +373,12 @@ Game* CreateGame(const char* pName, uid Type)
  */
 uib Game::EncBasic(bsp_game_desc* pd)
 {
-    byte* p = (byte*) pd;
+    pd->flags = NULL;
+    
+    if((flags & GAME_FLAG_RUN) && (run_type != RUN_MISC || (flags & GAME_FLAG_VALID_RUN)))
+        pd->flags |= BSP_GAME_FLAG_RUN;
+
+    byte* p = (byte*) pd->name_and_desc;
 
     *p++ = name_len;
     memcpy(p, name, name_len);
@@ -243,20 +393,28 @@ uib Game::EncBasic(bsp_game_desc* pd)
 void Game::EncExtended(bsp_game_desc_ex* pd)
 {
     pd->max_players = max_players;
-    pd->cur_players = cur_players;
     pd->clvl_diff = clvl_diff;
-    pd->uptime = (uib) (GetTickCount() - ts_hosted)/1000;
+    pd->uptime = (uiw) ((GetTickCount() - ts_hosted)/1000);
 }
 
-uib Game::EncCharlist(bsp_char_desc* pd)
+uib Game::EncPlayer(uib pid, bsp_pdesc* pd)
+{
+    pd->pid = pid;
+    pd->char_id = GetCharID(Charlist[pid].pc) | (Charlist[pid].pc == pHost ? BSP_PFLAG_HOST : 0);
+    pd->dt_join = (uiw) ((GetTickCount() - Charlist[pid].ts_joined)/1000);
+
+    return sizeof(bsp_pdesc);
+}
+
+uib Game::EncPlayerList(bsp_pdesc* pd)
 {
     union
     {
         byte* p;
-        bsp_char_desc* pcd;
+        bsp_pdesc* ppd;
     };
 
-    pcd = pd;
+    ppd = pd;
     *p++ = cur_players;
 
     for(uib i = 0; i < 8; i++)
@@ -264,7 +422,7 @@ uib Game::EncCharlist(bsp_char_desc* pd)
         if(!(bv_chars & (1<<i)))
             continue;
 
-        p += pCharlist[i]->Enc(pcd);
+        p += EncPlayer(i, ppd);
     }
 
     return (p - ((byte*) pd));
@@ -279,7 +437,15 @@ void Game::Destroy()
 {
     LOG("Destroy game: %s", name);
 
-    if(type & GT_FLAG_OPEN)
+    if(flags & GAME_FLAG_DESTROYED)
+    {
+        LERR("Tried to destroy game %s when destroyed", name);
+        return;
+    }
+
+    flags |= GAME_FLAG_DESTROYED;
+
+    if(flags & GAME_FLAG_OPEN)
         OnClose();
 
     if(pbncQuery)
@@ -290,7 +456,26 @@ void Game::Destroy()
 
     IdIdxTbl[((gt*) &type)->realm][game_id] = NULL;
 
-    freelist_free(&flGames, this);
+    Release();
+}
+
+
+/*
+ * Game reference counting
+ *
+ */
+void Game::AddRef()
+{
+    this->refs++;
+}
+
+void Game::Release()
+{
+    if((refs -= 1) <= 0)
+    {
+        LDBG("%s released (%d)", name, refs);
+        freelist_free(&flGames, this);
+    }
 }
 
 
@@ -298,12 +483,29 @@ void Game::Destroy()
  * CmpGamePri
  *
  */
-uib CmpGamePri(Game* pg1, Game* pg2, uid& ts)
+uib CmpGamePri(Game* pg1, Game* pg2, uid& ts, uib* pCondition)
 {
-    if(pg1->ts_dirty || pg2->ts_dirty)
-        return pg1->ts_dirty-1 < pg2->ts_dirty-1;
+    if(!pg1->ts_query_completed)
+    {
+        *pCondition = 1;
+        return TRUE;
+    }
 
-    return __max(pg1->ts_query_completed, pg1->ts_listed) < __max(pg2->ts_query_completed, pg2->ts_listed);
+    if((pg1->flags & GAME_FLAG_RUN) && (pg1->flags & GAME_FLAG_INFO) && !(pg1->flags & GAME_FLAG_POP_SAMP) && (ts-pg1->ts_hosted) >= CFG_RUN_POP_SAMP_TIME)
+    {
+        *pCondition = 2;
+        return TRUE;
+    }
+
+    if(pg1->ts_dirty || pg2->ts_dirty)
+    {
+        *pCondition = 3;
+        return pg1->ts_dirty-1 < pg2->ts_dirty-1;
+    }
+
+    *pCondition = 4;
+
+    return (__max(pg1->ts_query_completed, pg1->ts_listed) < __max(pg2->ts_query_completed, pg2->ts_listed));
 }
 
 
@@ -314,8 +516,30 @@ uib CmpGamePri(Game* pg1, Game* pg2, uid& ts)
  */
 void Game::OnOpen()
 {
+    // Note discovery time.
     ts_discovered = GetTickCount();
 
+    // Check if this game is a run.
+    if((this->run_type = GetRunType(name)))
+    {
+        char RunName[MAX_GAME_NAME];
+        char RunFormat[MAX_GAME_NAME+8];
+        uid Sequence;
+        Run* pRun;
+
+        this->flags |= GAME_FLAG_RUN;
+
+        if(ParseRunName(this->name, RunName, RunFormat, &Sequence))
+        {
+            if((pRun = LookupRun(RunName, this->type)))
+                pRun->OnGameOpen(this, RunFormat, Sequence);
+        }
+
+        else
+            LWARN("Failed to parse run name");
+     
+        LDBG("'%s' marked as run (type: %u)", name, run_type);
+    }
 
     // Queue message describing this event.
     union
@@ -339,6 +563,10 @@ void Game::OnOpen()
  */
 void Game::OnInfo()
 {
+    uid ts = GetTickCount();
+
+    LOG("[FIRST QUERY] (%s) %s discovery delay: %us first query delay: %us", fmt_gt(type), name, (ts_discovered-ts_hosted)/1000, (ts_query_submitted-ts_discovered)/1000);
+
     // Queue message.
     union
     {
@@ -351,6 +579,31 @@ void Game::OnInfo()
     pMsg->game_id = GetGameID(this);
     EncExtended(&pMsg->desc_ex);
     GetEMQ(type).p += sizeof(bsps_game_update);
+
+    if(this->flags & GAME_FLAG_RUN && (ts-ts_hosted) < CFG_CREATE_RUN_THRESH)
+    {
+        char RunName[MAX_GAME_NAME];
+        char RunFormat[MAX_GAME_NAME+8];
+        uid Sequence;
+        Run* pRun;
+
+        if(ParseRunName(name, RunName, RunFormat, &Sequence))
+        {
+            if(!LookupRun(RunName, type))
+            {
+                if((pRun = CreateRun(RunName, type, this->run_type)))
+                    pRun->OnGameOpen(this, RunFormat, Sequence);
+            }
+
+            else
+                LWARN("Run already existed: %s", RunName);
+        }
+
+        else
+            LWARN("Failed to parse run game name");
+    }
+
+    
 }
 
 
@@ -375,20 +628,158 @@ void Game::OnClose()
 }
 
 
+
 /*
- * Character::Enc
+ * Run::OnGameOpen
+ *   A game matching our run name has been opened.
  *
  */
-uib Character::Enc(bsp_char_desc* pd)
+void Run::OnGameOpen(Game* pGame, const char* pFormat, uid Sequence)
 {
-    pd->char_id = GetCharID(this);
-    pd->clvl = this->clvl;
-    pd->cls = this->cls;
-    pd->dt_join = (uib) (GetTickCount() - this->ts_join)/1000;
-    pd->name_len = this->name_len;
-    memcpy(pd->name, this->name, this->name_len);
+    if(pGame == pPreviousGame)
+    {
+        LWARN("(%s) Received game open for previous game: %s", Name, pGame->name);
+        return;
+    }
 
-    return sizeof(bsp_char_desc) + this->name_len;
+    if(pGame == pCurrentGame)
+    {
+        LWARN("(%s) Received game open for current game: %s", Name, pGame->name);
+        return;
+    }
+
+    LOG("(%s) Got next run: %s; run_count:%u current run: %s; previous run: %s", Name, pGame->name, run_count, pCurrentGame ? pCurrentGame->name : "<NULL>", pPreviousGame ? pPreviousGame->name : "<NULL>");
+
+    // Integrate data from the previous run; this run is not the current, it's 2 runs behind the new run.
+    if(pPreviousGame)
+    {
+        ProcessRunDataSample((pCurrentGame->ts_hosted - pPreviousGame->ts_hosted) / 1000, pPreviousGame->pop_sample);
+
+        pPreviousGame->Release();
+        pPreviousGame = NULL;
+    }
+
+    if(pCurrentGame)
+    {
+        // Set the current game as the previous; this will be used to calculate stats.
+        pPreviousGame = pCurrentGame;
+    }
+
+    // Assign our new current game.
+    pCurrentGame = pGame;
+    pCurrentGame->AddRef();
+
+    if(!(this->flags & RUN_FLAG_VALID))
+    {
+        if(run_type != RUN_MISC || (run_type == RUN_MISC && run_count >= 2))
+        {
+            LOG("Run %s is marked as a valid run", Name);
+
+            this->flags |= RUN_FLAG_VALID;
+        }
+    }
+
+    // Reset expiration timer.
+    timer_set(htExpire, GetTickCount()+GetRunTypeMaxDuration(this->run_type), NULL);
+
+    if(this->flags & RUN_FLAG_VALID)
+    {
+        pCurrentGame->flags |= GAME_FLAG_VALID_RUN;
+
+        // Update state.
+        union
+        {
+            bsps_run_state* pMsg;
+            byte* pd;
+        };
+
+        pd = GetEMQ(this->mode).p;
+        pMsg->mid = BSP_RUN_STATE;
+        pMsg->run_id = GetRunID(this);
+        GetEMQ(this->mode).p += sizeof(bsps_run_state) + Enc((bsp_run_desc*) pMsg->ect);
+    }
+}
+
+
+/*
+ * Run::ComputeStats
+ *
+ */
+void Run::ProcessRunDataSample(uid Duration, uid Popcount)
+{
+    uid idx = run_count++ % CFG_RUN_SAMPLE_COUNT;
+
+    LOG("(%s) Processing new run data; duration:%u popcount:%u (idx: %u)", Name, Duration, Popcount, idx);
+
+    stats.samples_duration[idx] = Duration;
+    stats.samples_popcount[idx] = Popcount;
+
+    uid sam_count = __min(run_count, CFG_RUN_SAMPLE_COUNT);
+
+    if(sam_count > CFG_RUN_MIN_SAMPL_CALC)
+    {
+        stddev(stats.samples_duration, sam_count, &stats.duration_avg, &stats.duration_stddev);
+        stddev(stats.samples_popcount, sam_count, &stats.population_avg, &stats.population_stddev);
+
+        LOG("Computed stats (avg/stddev): duration: %u/%u population: %u/%u",
+            stats.duration_avg, stats.duration_stddev,
+            stats.population_avg, stats.population_stddev);
+    }
+}
+
+
+/*
+ * Run::Enc
+ *
+ */
+uib Run::Enc(bsp_run_desc* pd)
+{
+    pd->cur_game_id = GetGameID(pCurrentGame);
+    pd->run_type = run_type;
+    pd->duration_avg = (uiw) stats.duration_avg;
+    pd->duration_stddev = (uib) stats.duration_stddev;
+    pd->popcount_avg = (uib) stats.population_avg;
+    pd->rating = stats.rating;
+
+    return sizeof(bsp_run_desc);
+}
+
+
+/*
+ * Run::Destroy
+ *
+ */
+void Run::Destroy()
+{
+    LOG("Destroy run %s", Name);
+
+    timer_destroy(htExpire);
+
+    if(pPreviousGame)
+    {
+        pPreviousGame->Release();
+        pPreviousGame = NULL;
+    }
+
+    if(pCurrentGame)
+    {
+        pCurrentGame->Release();
+        pCurrentGame = NULL;
+    }
+
+    union
+    {
+        bsps_run_close* pMsg;
+        byte* pd;
+    };
+
+    pd = GetEMQ(this->mode).p;
+    pMsg->mid = BSP_RUN_CLOSE;
+    pMsg->run_id = GetRunID(this);
+    GetEMQ(this->mode).p += sizeof(bsps_run_close);
+
+    list_remove(&lstRunType[mode & GT_TYPE_IDX_MASK], &ln_type);
+    freelist_free(&flRuns, this);
 }
 
 
@@ -396,9 +787,9 @@ uib Character::Enc(bsp_char_desc* pd)
  * Character::OnJoinGame
  *
  */
-void Character::OnJoinGame(Game* pGame)
+void Character::OnJoinGame(Game* pGame, uib pid)
 {
-    LDBG("%s joins %s", this->name, pGame->name);
+    LDBG("%s (pid:%u) joins %s", this->name, pid, pGame->name);
 
     union
     {
@@ -409,7 +800,22 @@ void Character::OnJoinGame(Game* pGame)
     pd = GetEMQ(pGame->type).p;
     pMsg->mid = BSP_GAME_PADD;
     pMsg->game_id = GetGameID(pGame);
-    GetEMQ(pGame->type).p += sizeof(bsps_game_padd) + Enc((bsp_char_desc*) pMsg->ect);
+    GetEMQ(pGame->type).p += sizeof(bsps_game_padd) + pGame->EncPlayer(pid, (bsp_pdesc*) pMsg->etc);
+}
+
+
+/*
+ * Character::Enc
+ *
+ */
+uib Character::Enc(bsp_char_desc* pd)
+{
+    pd->clvl = this->clvl;
+    pd->cls = this->cls;
+    pd->name_len = this->name_len;
+    memcpy(pd->name, this->name, this->name_len);
+
+    return sizeof(bsp_char_desc) + this->name_len;
 }
 
 
@@ -417,9 +823,9 @@ void Character::OnJoinGame(Game* pGame)
  * Character::OnLeaveGame
  *
  */
-void Character::OnLeaveGame(Game* pGame)
+void Character::OnLeaveGame(Game* pGame, uib pid)
 {
-    LDBG("%s leaves %s", this->name, pGame->name);
+    LDBG("%s (pid:%u) leaves %s", this->name, pid, pGame->name);
 
 
     union
@@ -431,7 +837,7 @@ void Character::OnLeaveGame(Game* pGame)
     pd = GetEMQ(pGame->type).p;
     pMsg->mid = BSP_GAME_PREM;
     pMsg->game_id = GetGameID(pGame);
-    pMsg->char_id = GetCharID(this);
+    pMsg->pid = pid;
     GetEMQ(pGame->type).p += sizeof(bsps_game_prem);
 }
 
@@ -457,9 +863,24 @@ Game* LookupGame(const char* pName, uid Type, uid GameID)
     LIST_ITERATE(lstGameRealm[((gt*) &Type)->realm], Game, ln_realm)
     {
         if(strcmp(pName, ple->name) == 0)
-        {
             return ple;
-        }
+    }
+
+    return NULL;
+}
+
+
+/*
+ * LookupRun
+ *
+ */
+Run* LookupRun(const char* pRunName, uid Type)
+{
+    // Brute search.
+    LIST_ITERATE(lstRunType[Type & GT_TYPE_IDX_MASK], Run, ln_type)
+    {
+        if(cmpstri(pRunName, ple->Name))
+            return ple;
     }
 
     return NULL;
@@ -475,12 +896,35 @@ void BnReadyQuery(BnClient* pbnc)
 {
     Game* pBest = NULL;
     uid ts = GetTickCount();
+    uib Condition;
 
     LIST_ITERATE(lstGameRealm[((gt*) &pbnc->Mode)->realm], Game, ln_realm)
     {
-        if(!ple->pbncQuery && (!pBest || CmpGamePri(ple, pBest, ts)))
+        if(ple->pbncQuery)
+            continue;
+
+        if(!pBest)
         {
             pBest = ple;
+            pBest->dbg_condition = 0xFF;
+            continue;
+        }
+        
+        uib Result = CmpGamePri(ple, pBest, ts, &(Condition=0xFF));
+
+        //LDBG("%s (last-q:%us last-l:%us dirty:%u) | %s | %s (last-q:%us last-l:%us dirty:%u) -- cond %u",
+        //        ple->name, (ts-ple->ts_query_submitted)/1000, (ts-ple->ts_listed)/1000, ple->ts_dirty != 0,
+        //        Result ? "GREATER THAN" : "LESS THAN",
+        //        pBest->name, (ts-pBest->ts_query_submitted)/1000, (ts-pBest->ts_listed)/1000, pBest->ts_dirty != 0,
+        //        Condition);
+
+        if(Result)
+        {
+            pBest = ple;
+            pBest->dbg_condition = Condition;
+
+            if(Condition < 3)
+                break;
         }
     }
 
@@ -492,15 +936,19 @@ void BnReadyQuery(BnClient* pbnc)
 
     if(pbnc->SubmitQueryRequest(pBest->name, pBest))
     {
-        LOG("[SUBMIT QUERY]: %s | last submit:%us last complete:%us last listed:%u)",
+        LOG("[SUBMIT QUERY] (%s) %s | last submit:%us last complete:%us last listed:%u dirty:%u condition:%u)",
+            fmt_gt(pBest->type),
             pBest->name,
             (ts-pBest->ts_query_submitted)/1000,
             (ts-pBest->ts_query_completed)/1000,
-            (ts-pBest->ts_listed)/1000);
+            (ts-pBest->ts_listed)/1000,
+            pBest->ts_dirty != 0,
+            pBest->dbg_condition);
 
         pBest->pbncQuery = pbnc;
         pBest->ts_query_submitted = GetTickCount();
         pBest->last_sched = ++sched_counter;
+
 
     }
 
@@ -545,6 +993,9 @@ void BnQueryComplete(BnClient* pbnc, mcps_query_game* pMsg, void* pContext)
         return;
     }
 
+    pGame->ts_query_completed = GetTickCount();
+    pGame->total_queries++;
+
     Type = McpToType(pMsg->status) | (pbnc->Mode & GT_MASK_REALM);
 
     // We missed detecting the game being closed.
@@ -561,12 +1012,9 @@ void BnQueryComplete(BnClient* pbnc, mcps_query_game* pMsg, void* pContext)
             return;
     }
 
-    pGame->ts_query_completed = GetTickCount();
-    
-
-    if(!(pGame->type & GT_FLAG_OPEN))
+    if(!(pGame->flags & GAME_FLAG_OPEN))
     {
-        pGame->type |= GT_FLAG_OPEN;
+        pGame->flags|= GAME_FLAG_OPEN;
         pGame->OnOpen();
     }
 
@@ -574,10 +1022,9 @@ void BnQueryComplete(BnClient* pbnc, mcps_query_game* pMsg, void* pContext)
     pGame->clvl_diff = pMsg->diff_lvl;
     pGame->max_players = pMsg->max_players;
 
-    if(!(pGame->type & GT_FLAG_INFO))
+    if(!(pGame->flags & GAME_FLAG_INFO))
     {
-        pGame->type |= GT_FLAG_INFO;
-
+        pGame->flags |= GAME_FLAG_INFO;
         pGame->ts_hosted = GetTickCount() - (pMsg->uptime*1000);
         pGame->OnInfo();
     }
@@ -593,6 +1040,7 @@ void BnQueryComplete(BnClient* pbnc, mcps_query_game* pMsg, void* pContext)
     uib LeaveMask = 0;
     uib CharCount = pMsg->cur_players;
     char* ps = pMsg->ect + 1 + (*pMsg->ect ? strlen(pMsg->ect) : 0);
+    uib bAccurate = (GetTickCount() - pGame->ts_hosted) < CFG_JOIN_ACCURACY_THRESH;
 
     for(uib i = 0, x = 0; i < CharCount && i < 8; i++, ps++, x=0)
     {
@@ -604,26 +1052,33 @@ void BnQueryComplete(BnClient* pbnc, mcps_query_game* pMsg, void* pContext)
             if(!(pGame->bv_chars & (1<<x)))
                 continue;
 
-            if(bzstrcmp(ps, pGame->pCharlist[x]->name))
+            if(bzstrcmp(ps, pGame->Charlist[x].pc->name))
                 break;
         }
 
-        Character* pc = pGame->pCharlist[x];
+        Character* pc = pGame->Charlist[x].pc;
 
         // Character exists; just an update. 
         if(x < 8)
         {
-            pc = pGame->pCharlist[x];
+            pc = pGame->Charlist[x].pc;
             LeaveMask |= (1<<x);
         }
 
         // Character doesn't exist; joined the game.
         else
-            pJoin[JoinLen++] = (pc = FindCharacter(Type, ps, TRUE));
+            pJoin[JoinLen++] = (pc = FindCharacter((uib) Type, ps, TRUE));
 
         // Update character information.
         pc->clvl = pMsg->char_levels[i];
-        pc->cls = pMsg->char_levels[i];
+        pc->cls = pMsg->char_classes[i];
+
+        if(bAccurate && !pGame->pHost && pc->clvl == pGame->host_clvl)
+        {
+            pGame->pHost = pc;
+
+            LDBG("[%s] Game host set as: %s", pGame->name, pc->name);
+        }
 
         ps += strlen(ps);
     }
@@ -638,8 +1093,8 @@ void BnQueryComplete(BnClient* pbnc, mcps_query_game* pMsg, void* pContext)
         if((LeaveMask & (1<<i)))
         {
             pGame->bv_chars ^= (1<<i); 
-            pGame->pCharlist[i]->OnLeaveGame(pGame);
-            pGame->pCharlist[i] = NULL;
+            pGame->Charlist[i].pc->OnLeaveGame(pGame, i);
+            pGame->Charlist[i].pc = NULL;
 
             redundant = 0;
         }
@@ -647,8 +1102,8 @@ void BnQueryComplete(BnClient* pbnc, mcps_query_game* pMsg, void* pContext)
         if(JoinLen && !(pGame->bv_chars & (1<<i)))
         {
             pGame->bv_chars ^= (1<<i);
-            pGame->pCharlist[i] = pJoin[--JoinLen];
-            pGame->pCharlist[i]->OnJoinGame(pGame);
+            pGame->Charlist[i].pc = pJoin[--JoinLen];
+            pGame->Charlist[i].pc->OnJoinGame(pGame, i);
 
             redundant = 0;
         }
@@ -656,18 +1111,25 @@ void BnQueryComplete(BnClient* pbnc, mcps_query_game* pMsg, void* pContext)
 
     pGame->cur_players = __popcnt((unsigned int) pGame->bv_chars);
 
+    if((pGame->flags & GAME_FLAG_RUN) && !(pGame->flags & GAME_FLAG_POP_SAMP) && (GetTickCount() - pGame->ts_hosted) >= CFG_RUN_POP_SAMP_TIME)
+    {
+        pGame->pop_sample = __max(pGame->pop_sample, pGame->cur_players);
+        pGame->flags |= GAME_FLAG_POP_SAMP;
+
+        LOG("(G:%s) Got pop sample: %u", pGame->name, pGame->pop_sample);
+    }
+
     if(redundant)
     {
         pGame->wasted_queries++;
     }
 
-    LDBG("[COMPLETE QUERY]: %s | Redundant? %s (%u)", pGame->name, redundant ? "YES" : "No", pGame->wasted_queries);
+    LDBG("[COMPLETE QUERY] (%s) %s | Redundant? %s (%u of %u)", fmt_gt(pGame->type), pGame->name, redundant ? "YES" : "No", pGame->wasted_queries, pGame->total_queries);
 
     if(pGame->ts_dirty && redundant)
         LDBG("----------- Dirty game was not dirty");
 
     pGame->ts_dirty = NULL;
-        
 }
 
 
@@ -709,9 +1171,9 @@ void BnListComplete(BnClient* pClient, mcps_game_list* pMsg)
         LDBG("DIRTY: %s", pGame->name);
     }
 
-    if(!(pGame->type & GT_FLAG_OPEN))
+    if(!(pGame->flags & GAME_FLAG_OPEN))
     {
-        pGame->type |= GT_FLAG_OPEN;
+        pGame->flags |= GAME_FLAG_OPEN;
 
         if(pMsg->etc[pGame->name_len+1])
             pGame->desc_len = strcpyn(pGame->description, sizeof(pGame->description), pMsg->etc+pGame->name_len+1);
@@ -794,10 +1256,159 @@ Character* FindCharacter(uib Mode, const char* pstrName, uib bCreateIfNotExist)
         memcpy(p->name, pstrName, p->name_len);
         Map[((gt*) &p->mode)->realm].Insert(p);
 
-        LDBG("Create character: p->name: '%s' (%u) pstrName: '%s'", p->name, p->name_len, pstrName);
+        LDBG("Create character: p->name: '%s' (%u) pstrName: '%s' -- total: %u", p->name, p->name_len, pstrName, Characters.count);
     }
 
     return p;
+}
+
+
+
+uib GetRunType(const char* pName)
+{
+    struct
+    {
+        const uib run_type;
+        const char* term;
+    } static const KEYWORDS[] =
+    {
+        { RUN_CBAAL, "cbaal" },
+        { RUN_CBAAL, "dbaal" },
+        { RUN_CBAAL, "dbal" },
+        { RUN_CBAAL, "diaba" },
+        { RUN_CBAAL, "db" },
+        { RUN_CBAAL, "dib" },
+        { RUN_CBAAL, "cbal" },
+        { RUN_COW, "cow" },
+        { RUN_TOMB, "tomb" },
+        { RUN_TRIST, "trist" },
+        { RUN_CHANT, "chant" },
+        { RUN_CHAOS, "dia" },
+        { RUN_CHAOS, "cha" },
+        { RUN_CHAOS, "khao" },
+        { RUN_CHAOS, "cs" },
+        { RUN_BAAL, "baal" },
+        { RUN_BAAL, "ball" },
+        { RUN_BAAL, "bal" },
+    };
+
+    uib len = (uib) strlen(pName);
+    uib result = NULL;
+
+    // Runs must have a trailing number.
+    if(((pName[len-1]) & 0xF0) != 0x30)
+        return NULL;
+
+    // Try to determine the run type.
+    for(uib i = 0; i < ARRAYSIZE(KEYWORDS); i++)
+    {
+        const char* pd = pName;
+
+        while(*pd)
+        {
+            while(*pd && !bzchrcmp(*pd, KEYWORDS[i].term[0]))
+                pd++;
+
+            if(!*pd)
+                break;
+
+            const char* ps1 = pd;
+            const char* ps2 = KEYWORDS[i].term;
+
+            while(bzchrcmp(*ps1, *ps2) && *ps1)
+            {
+                ps1++;
+                ps2++;
+            }
+
+            if(!*ps2)
+            {
+                LDBG("Matched '%s' at '%s'", KEYWORDS[i].term, pd);
+
+                result += KEYWORDS[i].run_type;
+
+                if(result >= RUN_CBAAL)
+                    goto DONE;
+            }
+
+            pd++;
+        }
+    }
+
+    // Some unrecognized run.
+    if(!result)
+    {
+        LWARN("Unknown run game: %s", pName);
+        result = RUN_MISC;
+    }
+
+DONE:
+    // Shouldnt happen
+    if(result > RUN_MAX)
+    {
+        LWARN("Bad run identification; %u", result);
+        return NULL;
+    }
+
+    return result;
+}
+
+
+uib ParseRunName(const char* pName, char* pRunName, char* pFormat, uid* pSequence)
+{
+    uib len = strlen(pName);
+    uib digits = 0;
+
+    // Sequence number is comprised of trailing digits.
+    pName += len-1;
+
+    while(digits < len && ((*pName >= '0') && (*pName <= '9')))
+    {
+        pName--;
+        digits++;
+    }
+
+    if(!digits || digits == len)
+        return FALSE;
+
+    // Length excluding the sequence.
+    len -= digits;
+    pName++;
+
+    // Extract sequence number and build run name and static format prefix.
+    *pSequence = sxui(pName);
+    memcpy(pRunName, pName-len, len);
+    memcpy(pFormat, pName-len, len);
+    pRunName[len] = '\0';
+
+    // Build the sequence number format.
+    pFormat += len;
+    *pFormat++ = '%';
+    *pFormat++ = '0';
+    *pFormat++ = '0' + digits;
+    *pFormat++ = 'u';
+    *pFormat = '\0';
+
+    return TRUE;
+}
+
+
+uid GetRunTypeMaxDuration(uib RunType)
+{
+    static const uid TBL[] =
+    {
+        (10*60*1000),
+        (8*60*1000),
+        (10*60*1000),
+        (15*60*1000),
+        (30*60*1000),
+        (25*60*1000),
+        (35*60*1000),
+        (10*60*1000),
+        (30*60*1000),
+    };
+
+    return TBL[RunType];
 }
 
 
@@ -807,10 +1418,11 @@ Character* FindCharacter(uib Mode, const char* pstrName, uib bCreateIfNotExist)
  */
 uib ServerStartup()
 {
-    if(!(plGames = (Game*) VirtualAlloc(NULL, CFG_GAME_POOL_SZ * sizeof(Game), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE)))
+    if(!(plGames = (Game*) VirtualAlloc(NULL, CFG_GAME_POOL_SZ * sizeof(Game), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE)) || !(plRuns = (Run*) VirtualAlloc(NULL, CFG_RUN_POOL_SZ * sizeof(Run), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE)))
         return FALSE;
 
     freelist_init(&flGames, plGames, sizeof(Game), CFG_GAME_POOL_SZ);
+    freelist_init(&flRuns, plRuns, sizeof(Run), CFG_RUN_POOL_SZ);
 
     for(uib i = 0; i < ARRAYSIZE(EvtMsgQueue); i++)
         EvtMsgQueue[i].p = EvtMsgQueue[i].data;
@@ -831,7 +1443,7 @@ uib ServerStartup()
     timer_set(ht, 0, CFG_EVTMSG_FLUSH_INT);
 
 
-    if(!(Users.p = (User*) MapPersistantArray("users", USER_DATA_SIZE, 0x10000, &Users.count, TRUE)))
+    if(!(Users.p = (User*) MapPersistantArray("users", USER_DATA_SIZE, CFG_MAX_BN_USERS, &Users.count, TRUE)))
     {
         LERR("Failed to load users from disk");
         return FALSE;
@@ -843,7 +1455,7 @@ uib ServerStartup()
     for(uid i = 0; i < Users.count; i++)
         FindUser(Users.p[i].mode, Users.p[i].name, TRUE);
 
-    if(!(Characters.p = (Character*) MapPersistantArray("characters", CHARACTER_DATA_SIZE, 0x10000, &Characters.count, TRUE)))
+    if(!(Characters.p = (Character*) MapPersistantArray("characters", CHARACTER_DATA_SIZE, CFG_MAX_BN_CHARACTERS, &Characters.count, TRUE)))
     {
         LERR("Failed to load characters from disk");
         return FALSE;

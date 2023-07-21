@@ -46,10 +46,15 @@ union gt
 #define GT_FLAG_EXPANSION  (1<<4)
 
 // Internal flags
-#define GT_FLAG_OPEN (1<<31) /* We've had authoritive confirmation this game exists */
-#define GT_FLAG_INFO (1<<30) /* We've received extended (query/info) on this game */
+#define GAME_FLAG_DESTROYED (1<<0) /* Game has been destroyed; pending release. */
+#define GAME_FLAG_OPEN      (1<<1) /* We've had authoritive confirmation this game exists */
+#define GAME_FLAG_INFO      (1<<2) /* We've received extended (query/info) on this game */
+#define GAME_FLAG_RUN       (1<<3) /* Game is a run, regardless */
+#define GAME_FLAG_POP_SAMP  (1<<4) /* We have a population sample of this run-type game. */
+#define GAME_FLAG_VALID_RUN (1<<5) 
 
-
+// Run flags
+#define RUN_FLAG_VALID  (1<<0)
 
 /*
  * bn_acc_desc
@@ -87,18 +92,31 @@ struct bn_key_desc
 #define CFG_THREAD_PRIORITY   THREAD_PRIORITY_HIGHEST
 #define CFG_EVTMSG_FLUSH_INT  1000
 #define CFG_GAME_POOL_SZ      0x2000
+#define CFG_RUN_POOL_SZ       512
 #define CFG_MAX_GAME_ID_MASK  0x7FF /* Must be power of 2-1 */
 #define CFG_MAX_SESSIONS      0x8000
 #define CFG_WEBSOCKET_PORT    1504
 #define CFG_BSP_KEEPALIVE_INT 15000
+#define CFG_BSP_MAX_RESOLVE_COUNT  128
+#define CFG_MAX_BN_CHARACTERS    0x100000
+#define CFG_MAX_BN_USERS         0x100000
+
+// Runs
+#define CFG_CREATE_RUN_THRESH  30000
+#define CFG_RUN_SAMPLE_COUNT   6
+#define CFG_RUN_MIN_SAMPL_CALC 3
+#define CFG_RUN_POP_SAMP_TIME  (50 * 1000)
+#define CFG_RUN_EXPIRE_TIME    (12 * 60 * 1000)
 
 // Client (BSP) rate limiting
 #define CFG_BSP_MAX_CONNECTIONS 4 /* Maximum concurrent websocket connections */
-#define CFG_BSP_TKNBKT_TCP_COST 1 /* Cost per TCP connection attempt, in tokens */
-#define CFG_BSP_TKNBKT_REQ_COST 1 /* Cost per game list request, in tokens */
+#define CFG_BSP_TKNBKT_TCP_COST 50 /* Cost per TCP connection attempt, in tokens */
+#define CFG_BSP_TKNBKT_RESOLVE_N_COST 1 /* Cost per character resolves per resolve request, in tokens */
+#define CFG_BSP_TKNBKT_RESOLVE_BASE_COST  10 /* Cost per resolve request, in tokens */
+#define CFG_BSP_TKNBKT_FETCH_COST 100 /* Cost per list request, in tokens */
 #define CFG_BSP_TKNBKT_RX_COST  1 /* Cost per byte */
-#define CFG_BSP_TKNBKT_MAX_SIZE 12 /* Maximum bucket size, in tokens */
-#define CFG_BSP_TKNBKT_RATE     8 /* Tokens/1024th second */
+#define CFG_BSP_TKNBKT_MAX_SIZE 3500 /* Maximum bucket size, in tokens */
+#define CFG_BSP_TKNBKT_RATE     400 /* Tokens/second (1024ms) */
 
 // netlib
 #define CFG_NETLIB_HEAP_SZ  0xFFFFFF /* 16MB */
@@ -106,7 +124,7 @@ struct bn_key_desc
 #define CFG_NETLIB_IOPS     (CFG_NETLIB_SOCKETS * 8)
 
 // Maximum userland timers
-#define CFG_MAX_TIMERS  512
+#define CFG_MAX_TIMERS  1024
 
 // Game query rate control (delay)
 #define CFG_MCP_QUERY_DELAY 1000

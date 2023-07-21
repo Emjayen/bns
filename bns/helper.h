@@ -30,6 +30,8 @@ void fire_timers();
 uib init_timers(uid MaxTimers);
 
 
+// Misc
+#define bzchrcmp(_c1, _c2) ((((byte) (_c1)) & 0xDF) == (((byte) (_c2)) & 0xDF))
 
 /*
  * rnd
@@ -157,6 +159,13 @@ void* MapPersistantArray(const char* pstrFilename, uid ElementSz, uid MaxElement
  *
  */
 uib bzstrcmp(const char* p1, const char* p2);
+
+
+/*
+ * stddev
+ *
+ */
+void stddev(uid* pData, uib Count, uid* pAvg, uid* pStdDev);
 
 
 #endif

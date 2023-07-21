@@ -51,7 +51,7 @@ typedef uib (*PFMSGHANDLER)(BnClient*, void*);
 
 // Message handling tables
 extern const PFMSGHANDLER BNP_HANDLER[0x100];
-extern const PFMSGHANDLER MCP_HANDLER[0x20];
+extern const PFMSGHANDLER MCP_HANDLER[0x100];
 
 // Context logging
 #define xLWARN(_pbnc, _pFormat, ...) LWARN("[%s] " _pFormat, _pbnc->pAccount->name, __VA_ARGS__)
@@ -285,14 +285,9 @@ static void NETLIBCALLBACK OnConnect(BnClient* pThis, void* _1, uid _2, uid Erro
 {
     if(Error)
     {
-        if(Error == 0xC00000B5 /*STATUS_IO_TIMEOUT*/)
-        {
-            NotifyProxyFailure(pThis->pProxy);
-        }
-
-
         SetLastError(Error);
         xLERR(pThis, "Failed to connect to proxy server.");
+        NotifyProxyFailure(pThis->pProxy);
         goto FAIL;
     }
 
@@ -725,13 +720,12 @@ FAIL:
  */
 void BnClient::Disconnect()
 {
+    if(State >= BNC_STATE_MCP_LOGGED)
+        BnNotifyStatus(Mode, FALSE);
+
     SetState(BNC_STATE_NONE);
 
     xLOG(this, "Disconnected");
-
-
-    if(State >= BNC_STATE_MCP_LOGGED)
-        BnNotifyStatus(Mode, FALSE);
 
     if(MCP.pending_info_request.ts_sent)
         CompleteQueryRequest(NULL);
@@ -950,7 +944,7 @@ BNP_HANDLER(BNP_LOGIN, bnps_login)
     {
         if(pMsg->status == BNP_LS_BAD_PASSWORD)
         {
-            FATAL("Incorrect password configuration: '%s' '%s'", pThis->pAccount->name, pThis->pAccount->password);
+            LERR("Incorrect password configuration: '%s'", pThis->pAccount->name);
         }
 
         return FALSE;
@@ -1162,6 +1156,11 @@ MCP_HANDLER(MCP_QUERY_GAME, mcps_query_game)
 }
 
 
+MCP_HANDLER(MCP_NULL, void)
+{
+    return TRUE;
+}
+
 
 /*
  * BNP handler table
@@ -1265,9 +1264,9 @@ const PFMSGHANDLER BNP_HANDLER[0x100] =
 #undef HANDLER
 #define HANDLER(name) (PFMSGHANDLER) MCP_##name
 
-const PFMSGHANDLER MCP_HANDLER[0x20] =
+const PFMSGHANDLER MCP_HANDLER[0x100] =
 {
-    NULL,
+    HANDLER(MCP_NULL),
     HANDLER(MCP_STARTUP),
     NULL,
     NULL,

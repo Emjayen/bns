@@ -167,13 +167,13 @@ static void NETLIBCALLBACK OnWsReceive(Session* pThis, byte* pBuffer, uid Bytes,
 
     pThis->tsRxLast = GetTickCount();
 
-    if(!ChargeHost(pThis->pHost, CFG_BSP_TKNBKT_RX_COST))
+    LDBG("Websock: Received %u bytes: ", Bytes);
+
+    if(!ChargeHost(pThis->pHost, CFG_BSP_TKNBKT_RX_COST * Bytes))
     {
-        LWARN("[ABUSE] %a exceeded rx rate limit");
+        LWARN("[ABUSE] %a exceeded rx rate limit", pThis->Addr);
         goto FAIL;
     }
-
-    LDBG("Websock: Received %u bytes: ", Bytes);
 
     while(Bytes)
     {
@@ -195,34 +195,49 @@ static void NETLIBCALLBACK OnWsReceive(Session* pThis, byte* pBuffer, uid Bytes,
             break;
         }
 
+        uib HdrSz = WS_MIN_HDR_SZ+4;
         uib Opcode = p[0] & WS_OP_MASK;
-        uib FrameSz = p[1] & WS_LENGTH_MASK;
+        uid PayloadSz = p[1] & WS_LENGTH_MASK;
         
-        if(FrameSz >= 126)
+        if(PayloadSz >= 127)
         {
             LWARN("Websocket extended-length frame received.");
             break;
         }
 
-        if(Bytes < ((uid) FrameSz) + 6)
+        if(PayloadSz >= 126)
         {
-            LWARN("Insufficient data for websocket frame (%u < %u)", Bytes, FrameSz + 6);
+            if(Bytes < WS_MIN_HDR_SZ + 6)
+            {
+                LWARN("Insufficient data for websocket header (extended length)");
+                break;
+            }
+
+            PayloadSz = bswap16(*((uiw*) &p[2]));
+            HdrSz += 2;
+        }
+
+        const uid FrameSz = HdrSz + PayloadSz;
+
+        if(Bytes < FrameSz)
+        {
+            LWARN("Insufficient data for websocket frame (%u < %u)", Bytes, FrameSz);
             break;
         }
 
-        p += 6;
+        p += HdrSz;
 
-        for(uid i = 0; i < FrameSz; i++)
+        for(uid i = 0; i < PayloadSz; i++)
             p[i] ^= *(p-4+(i&0x3));
 
 
         if(Opcode == WS_OP_BIN)
         {
-            if(!pThis->OnReceive(p, FrameSz))
+            if(!pThis->OnReceive(p, PayloadSz))
                 goto FAIL;
         }
 
-        Bytes -= FrameSz + 6;
+        Bytes -= FrameSz;
         p += FrameSz;
     }
 
@@ -250,6 +265,8 @@ uib Session::OnReceive(byte* pMsg, uid Length)
     switch(*pMsg)
     {
         case BSP_FETCH_LIST: return OnFetchList((bspc_fetch_list*) pMsg, Length); break;
+        case BSP_RESOLVE_CHAR: return OnResolveChar((bspc_resolve_char*) pMsg, Length); break;
+        case BSP_FEEDBACK: return OnFeedback((bspc_feedback*) pMsg, Length); break;
 
         default:
             LWARN("[ABUSE] Unknown BSP message: 0x%X (%u)", *pMsg, Length);
@@ -325,8 +342,6 @@ static void TcbPing(void*)
             ping[1] = 0;
 
             net_send(ple->s, ping, sizeof(ping));
-
-            LDBG("Send %a ws ping", ple->Addr);
         }
     }
 }
@@ -394,7 +409,7 @@ static uib WriteWsHdr(byte* pHdr, uid PayloadLen)
     {
         pHdr[0] = WS_OP_BIN|WS_CTLF_FIN;
         pHdr[1] = 126;
-        *((uiw*) &pHdr[2]) = bswap16(PayloadLen);
+        *((uiw*) &pHdr[2]) = bswap16(((uiw) PayloadLen));
         return 4;
     }
 }
@@ -426,7 +441,7 @@ uib ChargeHost(host* pHost, uid Charge)
 
     
     // Refill tokens.
-    pHost->bkt_tokens += (uib) (((ts - pHost->ts_last_add) >> 10) * CFG_BSP_TKNBKT_RATE);
+    pHost->bkt_tokens += (((ts - pHost->ts_last_add) >> 10) * CFG_BSP_TKNBKT_RATE);
     pHost->bkt_tokens = __min(pHost->bkt_tokens, CFG_BSP_TKNBKT_MAX_SIZE);
     pHost->ts_last_add = ts;
 

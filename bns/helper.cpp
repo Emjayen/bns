@@ -710,3 +710,68 @@ uib bzstrcmp(const char* p1, const char* p2)
 
 	return (*p1 == 0) && (*p2 == 0);
 }
+
+
+
+/*
+ * fisqrt
+ *
+ */
+uid isqrt(uid a_nInput)
+{
+	uid op = a_nInput;
+	uid res = 0;
+	uid one = 1uL << 30; // The second-to-top bit is set: use 1u << 14 for uint16_t type; use 1uL<<30 for uint32_t type
+
+
+	// "one" starts at the highest power of four <= than the argument.
+	while(one > op)
+	{
+		one >>= 2;
+	}
+
+	while(one != 0)
+	{
+		if(op >= res + one)
+		{
+			op = op - (res + one);
+			res = res +  2 * one;
+		}
+		res >>= 1;
+		one >>= 2;
+	}
+	return res;
+}
+
+
+/*
+ * stddev
+ *
+ */
+void stddev(uid* pData, uib Count, uid* pAvg, uid* pStdDev)
+{
+	uid samples = 0;
+	uid sum = 0;
+	uid sq_sum = 0;
+
+	*pAvg = 0;
+	*pStdDev = 0;
+
+	for(uib i = 0; i < Count; i++)
+	{
+		uid v = pData[i];
+
+		if(v)
+		{
+			sum += v;
+			sq_sum += v * v;
+			samples++;
+		}
+	}
+
+	if(!samples)
+		return;
+
+	*pAvg = sum / samples;
+	*pStdDev = isqrt((samples * sq_sum - sum * sum) / (samples * samples));
+}

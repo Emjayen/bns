@@ -37,12 +37,12 @@ static uib GetUserMaximumConnections(char* pPrxUsername)
     return 1;
 #else
     if(cmpstri(pPrxUsername, "dim"))
-        return 3;
+        return 0;
 
     else if(cmpstri(pPrxUsername, "matt"))
         return 6;
 
-    return 7;
+    return 6;
 #endif
 }
 
